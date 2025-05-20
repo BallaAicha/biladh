@@ -166,3 +166,83 @@ public class TeamSpaceRepositoryImpl implements TeamSpaceRepository {
         teamSpaceJpaRepository.deleteById(id);
     }
 }
+
+
+
+
+
+
+-----------------------------------
+
+
+// Ajouter ces méthodes dans la classe TeamSpaceEntity
+
+public TeamSpaceDTO toDTO() {
+    Set<UserDTO> memberDTOs = this.members.stream()
+            .map(member -> member.getUser().toDTO())
+            .collect(Collectors.toSet());
+
+    Set<FolderDTO> folderDTOs = this.folders.stream()
+            .map(folder -> {
+                FolderDTO dto = new FolderDTO();
+                dto.setId(folder.getId());
+                dto.setName(folder.getName());
+                dto.setDescription(folder.getDescription());
+                dto.setCreatedAt(folder.getCreatedAt());
+                dto.setUpdatedAt(folder.getUpdatedAt());
+                return dto;
+            })
+            .collect(Collectors.toSet());
+
+    return TeamSpaceDTO.builder()
+            .id(this.id)
+            .name(this.name)
+            .description(this.description)
+            .status(this.status.toString())
+            .members(memberDTOs)
+            .folders(folderDTOs)
+            .createdAt(this.createdAt)
+            .updatedAt(this.updatedAt)
+            .build();
+}
+
+public static TeamSpaceEntity fromDTO(TeamSpaceDTO dto) {
+    TeamSpaceEntity entity = new TeamSpaceEntity();
+    entity.setId(dto.getId());
+    entity.setName(dto.getName());
+    entity.setDescription(dto.getDescription());
+    entity.setStatus(TeamSpaceStatus.valueOf(dto.getStatus()));
+    entity.setCreatedAt(dto.getCreatedAt());
+    entity.setUpdatedAt(dto.getUpdatedAt());
+
+    // Les collections (members et folders) devraient être gérées séparément
+    // car elles nécessitent des références aux entités existantes
+    entity.setMembers(new HashSet<>());
+    entity.setFolders(new HashSet<>());
+
+    return entity;
+}
+
+
+---------------------------
+// Ajouter ces méthodes dans la classe TeamSpaceMemberEntity
+
+public TeamSpaceMemberDTO toDTO() {
+    return TeamSpaceMemberDTO.builder()
+            .id(this.id)
+            .teamSpaceId(this.teamSpace.getId())
+            .user(this.user.toDTO())
+            .role(this.role)
+            .joinedAt(this.joinedAt)
+            .build();
+}
+
+public static TeamSpaceMemberEntity fromDTO(TeamSpaceMemberDTO dto, TeamSpaceEntity teamSpace, UserEntity user) {
+    return TeamSpaceMemberEntity.builder()
+            .id(dto.getId())
+            .teamSpace(teamSpace)
+            .user(user)
+            .role(dto.getRole())
+            .joinedAt(dto.getJoinedAt())
+            .build();
+}
