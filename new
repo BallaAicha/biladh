@@ -1,0 +1,168 @@
+@Entity
+@Table(name = "team_spaces")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TeamSpaceEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    private String description;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TeamSpaceStatus status;
+
+    @OneToMany(mappedBy = "teamSpace", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<TeamSpaceMemberEntity> members = new HashSet<>();
+
+    @OneToMany(mappedBy = "teamSpace", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<FolderEntity> folders = new HashSet<>();
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    public TeamSpaceDTO toDTO() {
+        TeamSpaceDTO dto = new TeamSpaceDTO();
+        dto.setId(this.id);
+        dto.setName(this.name);
+        dto.setDescription(this.description);
+        dto.setStatus(this.status.name());
+        dto.setCreatedAt(this.createdAt);
+        dto.setUpdatedAt(this.updatedAt);
+
+        if (this.members != null) {
+            Set<TeamSpaceMemberDTO> memberDTOs = this.members.stream()
+                    .map(TeamSpaceMemberEntity::toDTO)
+                    .collect(Collectors.toSet());
+            dto.setMembers(memberDTOs);
+        } else {
+            dto.setMembers(new HashSet<>());
+        }
+
+        if (this.folders != null) {
+            Set<Long> folderIds = this.folders.stream()
+                    .map(FolderEntity::getId)
+                    .collect(Collectors.toSet());
+            dto.setFolderIds(folderIds);
+        } else {
+            dto.setFolderIds(new HashSet<>());
+        }
+
+        return dto;
+    }
+
+    public static TeamSpaceEntity fromDTO(TeamSpaceDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        TeamSpaceEntity entity = new TeamSpaceEntity();
+        entity.setId(dto.getId());
+        entity.setName(dto.getName());
+        entity.setDescription(dto.getDescription());
+        entity.setStatus(TeamSpaceStatus.valueOf(dto.getStatus()));
+        entity.setCreatedAt(dto.getCreatedAt());
+        entity.setUpdatedAt(dto.getUpdatedAt());
+        return entity;
+    }
+}
+
+
+
+------------
+
+
+@Entity
+@Table(name = "team_space_members")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TeamSpaceMemberEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_space_id", nullable = false)
+    private TeamSpaceEntity teamSpace;
+
+    @Column(name = "user_igg", nullable = false)
+    private String userIgg;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TeamSpaceRole role;
+
+    @Column(name = "joined_at")
+    private LocalDateTime joinedAt;
+
+    public TeamSpaceMemberDTO toDTO() {
+        TeamSpaceMemberDTO dto = new TeamSpaceMemberDTO();
+        dto.setId(this.id);
+        dto.setTeamSpaceId(this.teamSpace != null ? this.teamSpace.getId() : null);
+        dto.setUserIgg(this.userIgg);
+        dto.setRole(this.role.name());
+        dto.setJoinedAt(this.joinedAt);
+        return dto;
+    }
+
+    public static TeamSpaceMemberEntity fromDTO(TeamSpaceMemberDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        TeamSpaceMemberEntity entity = new TeamSpaceMemberEntity();
+        entity.setId(dto.getId());
+        entity.setUserIgg(dto.getUserIgg());
+        entity.setRole(TeamSpaceRole.valueOf(dto.getRole()));
+        entity.setJoinedAt(dto.getJoinedAt());
+        return entity;
+    }
+}
+
+
+---------
+
+
+
+@Component
+@RequiredArgsConstructor
+public class TeamSpaceRepositoryImpl implements TeamSpaceRepository {
+    private final TeamSpaceJpaRepository teamSpaceJpaRepository;
+
+    @Override
+    public TeamSpaceDTO save(TeamSpaceDTO dto) {
+        TeamSpaceEntity entity = TeamSpaceEntity.fromDTO(dto);
+        return teamSpaceJpaRepository.save(entity).toDTO();
+    }
+
+    @Override
+    public Optional<TeamSpaceDTO> findById(Long id) {
+        return teamSpaceJpaRepository.findById(id)
+                .map(TeamSpaceEntity::toDTO);
+    }
+
+    @Override
+    public List<TeamSpaceDTO> findByUserIgg(String userIgg) {
+        return teamSpaceJpaRepository.findByMembers_UserIgg(userIgg).stream()
+                .map(TeamSpaceEntity::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        teamSpaceJpaRepository.deleteById(id);
+    }
+}
