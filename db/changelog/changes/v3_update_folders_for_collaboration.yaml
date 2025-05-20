@@ -1,0 +1,53 @@
+databaseChangeLog:
+  - changeSet:
+      id: 3
+      author: BallaAicha
+      changes:
+        - addColumn:
+            tableName: folders
+            columns:
+              - column:
+                  name: team_space_id
+                  type: bigint
+                  constraints:
+                    foreignKeyName: fk_folder_team_space
+                    references: team_spaces(id)
+              - column:
+                  name: is_collaborative
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_folders_team_space
+            tableName: folders
+            columns:
+              - column:
+                  name: team_space_id
+                  type: bigint
+
+        # Ajout de colonnes pour le suivi des documents partagés
+        - addColumn:
+            tableName: documents
+            columns:
+              - column:
+                  name: original_document_id
+                  type: bigint
+                  constraints:
+                    foreignKeyName: fk_document_original
+                    references: documents(id)
+              - column:
+                  name: shared_status
+                  type: varchar(50)
+                  defaultValue: 'PRIVATE'
+                  constraints:
+                    nullable: false
+
+        - createIndex:
+            indexName: idx_documents_original
+            tableName: documents
+            columns:
+              - column:
+                  name: original_document_id
+                  type: bigint

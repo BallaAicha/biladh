@@ -1,0 +1,80 @@
+databaseChangeLog:
+  - changeSet:
+      id: 1
+      author: BallaAicha
+      changes:
+        - createTable:
+            tableName: team_spaces
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: text
+              - column:
+                  name: status
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp
+                  defaultValueDate: CURRENT_TIMESTAMP
+              - column:
+                  name: updated_at
+                  type: timestamp
+                  defaultValueDate: CURRENT_TIMESTAMP
+
+        - createTable:
+            tableName: team_space_members
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: team_space_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_team_space_member_team_space
+                    references: team_spaces(id)
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    foreignKeyName: fk_team_space_member_user
+                    references: users(id)
+              - column:
+                  name: role
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: joined_at
+                  type: timestamp
+                  defaultValueDate: CURRENT_TIMESTAMP
+
+        - addUniqueConstraint:
+            tableName: team_spaces
+            columnNames: name
+            constraintName: uk_team_space_name
+
+        - addUniqueConstraint:
+            tableName: team_space_members
+            columnNames: team_space_id, user_id
+            constraintName: uk_team_space_member

@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - include:
+      file: changes/v1_create_team_spaces_and_members.yaml
+      relativeToChangelogFile: true
+  - include:
+      file: changes/v2_update_existing_tables.yaml
+      relativeToChangelogFile: true
