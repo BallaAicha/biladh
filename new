@@ -246,3 +246,75 @@ public static TeamSpaceMemberEntity fromDTO(TeamSpaceMemberDTO dto, TeamSpaceEnt
             .joinedAt(dto.getJoinedAt())
             .build();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+----------------------------
+
+
+
+
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AddTeamSpaceMemberImpl implements AddTeamSpaceMember {
+    private final TeamSpaceRepository teamSpaceRepository;
+    private final UserRepository userRepository;
+    private final TeamSpaceMemberRepository memberRepository;
+
+    @Override
+    @Transactional
+    public TeamSpaceMemberDTO handle(AddTeamSpaceMemberRequest input, RequestContext context) {
+        log.info("Adding member with IGG {} to team space {}", input.getMemberIgg(), input.getTeamSpaceId());
+
+        String requestingUserIgg = context.getUser().get().getIgg().toString();
+
+        // Verify team space exists
+        TeamSpaceEntity teamSpace = teamSpaceRepository.findById(input.getTeamSpaceId())
+                .orElseThrow(() -> new IllegalArgumentException("Team space not found"));
+
+        // Verify requesting user is admin or owner
+        boolean isAdmin = teamSpace.getMembers().stream()
+                .anyMatch(member -> member.getUser().getIgg().equals(requestingUserIgg)
+                        && (member.getRole() == TeamSpaceRole.ADMIN || member.getRole() == TeamSpaceRole.OWNER));
+
+        if (!isAdmin) {
+            throw new AccessDeniedException("Only admins can add members");
+        }
+
+        // Verify new member exists
+        UserEntity userToAdd = userRepository.findByIgg(input.getMemberIgg())
+                .orElseThrow(() -> new IllegalArgumentException("User to be added not found"));
+
+        // Verify user isn't already a member
+        if (memberRepository.findByTeamSpaceIdAndUserIgg(input.getTeamSpaceId(), input.getMemberIgg()).isPresent()) {
+            throw new IllegalArgumentException("User is already a member of this team space");
+        }
+
+        // Create new member entity
+        TeamSpaceMemberEntity member = TeamSpaceMemberEntity.builder()
+                .teamSpace(teamSpace)
+                .user(userToAdd)
+                .role(input.getRole())
+                .build();
+
+        // Add member to team space's members set
+        teamSpace.getMembers().add(member);
+
+        // Save member
+        TeamSpaceMemberEntity savedMember = memberRepository.save(member);
+        log.info("Member added successfully to team space");
+
+        return savedMember.toDTO();
+    }
+}
