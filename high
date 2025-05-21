@@ -1,0 +1,152 @@
+Voici mon entité :
+@Entity
+@Table(name = "team_spaces")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TeamSpaceEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String name;
+
+    private String description;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TeamSpaceStatus status;
+
+    @OneToMany(mappedBy = "teamSpace", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<TeamSpaceMemberEntity> members = new HashSet<>();
+
+    @OneToMany(mappedBy = "teamSpace", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<FolderEntity> folders = new HashSet<>();
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+
+
+
+
+——————————————
+
+@Entity
+@Table(name = "team_space_members")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class TeamSpaceMemberEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_space_id", nullable = false)
+    private TeamSpaceEntity teamSpace;
+
+    @Column(name = "user_igg", nullable = false)
+    private String userIgg;
+
+    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TeamSpaceRole role;
+
+    @Column(name = "joined_at")
+    private LocalDateTime joinedAt;
+
+
+————————
+
+
+public enum TeamSpaceRole {
+    OWNER,
+    ADMIN,
+    MEMBER
+}
+
+
+
+
+
+
+
+
+-----------
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+    http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.8.xsd">
+
+    <!-- ========= Création de la table team_spaces ========= -->
+    <changeSet id="1-create-team-spaces" author="ousmane.mbacke">
+        <createTable tableName="team_spaces">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="name" type="VARCHAR(255)">
+                <constraints nullable="false" />
+            </column>
+            <column name="description" type="VARCHAR(1000)" />
+            <column name="status" type="VARCHAR(50)">
+                <constraints nullable="false" />
+            </column>
+            <column name="created_at" type="TIMESTAMP" />
+            <column name="updated_at" type="TIMESTAMP" />
+        </createTable>
+    </changeSet>
+
+    <!-- ========= Création de la table team_space_members ========= -->
+    <changeSet id="2-create-team-space-members" author="ousmane.mbacke">
+        <createTable tableName="team_space_members">
+            <column name="id" type="BIGINT" autoIncrement="true">
+                <constraints primaryKey="true" nullable="false" />
+            </column>
+            <column name="team_space_id" type="BIGINT">
+                <constraints nullable="false" />
+            </column>
+            <column name="user_igg" type="VARCHAR(255)">
+                <constraints nullable="false" />
+            </column>
+            <column name="role" type="VARCHAR(50)">
+                <constraints nullable="false" />
+            </column>
+            <column name="joined_at" type="TIMESTAMP" />
+        </createTable>
+
+        <addForeignKeyConstraint
+            baseTableName="team_space_members"
+            baseColumnNames="team_space_id"
+            constraintName="fk_team_space_members_team_space"
+            referencedTableName="team_spaces"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+    <!-- ========= Mise à jour de la table folders pour ajouter la relation avec team_space ========= -->
+    <changeSet id="3-add-team-space-to-folders" author="ousmane.mbacke">
+        <addColumn tableName="folders">
+            <column name="team_space_id" type="BIGINT"/>
+        </addColumn>
+
+        <addForeignKeyConstraint
+            baseTableName="folders"
+            baseColumnNames="team_space_id"
+            constraintName="fk_folders_team_space"
+            referencedTableName="team_spaces"
+            referencedColumnNames="id"
+            onDelete="CASCADE"/>
+    </changeSet>
+
+</databaseChangeLog>
