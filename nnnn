@@ -1,312 +1,409 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { APIService } from '../../types/api';
-import {
-    Shield,
-    GitBranch,
-    CheckCircle2,
-    AlertCircle,
-    Calendar,
-    User,
-    Code,
-    Eye,
-    ChevronRight,
-    Search,
-    BarChart3,
-    Activity
-} from 'lucide-react';
-import clsx from 'clsx';
+import { services } from '../../services/api';
 
-interface ServicesListProps {
-    services: APIService[];
-    selectedService: APIService | null;
-    onSelectService: (service: APIService) => void;
+export const useAllServices = () => {
+    return useQuery<APIService[]>({
+        queryKey: ['services', 'all'],
+        queryFn: () => services.getAllServices(),
+    });
+};
+
+export default useAllServices;
+
+
+
+
+
+
+----------------
+import { useQuery } from '@tanstack/react-query';
+import { APIService } from '../../types/api';
+import apiDocumentationService from '../../services/api-documentation-service';
+
+export const useAllServices = () => {
+    return useQuery<APIService[]>({
+        queryKey: ['services', 'all'],
+        queryFn: () => apiDocumentationService.getAllServices(),
+    });
+};
+
+export default useAllServices;
+
+
+---------------------
+Pagination: 1
+
+
+import React from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+interface PaginationProps {
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
 }
 
-const ServicesList: React.FC<ServicesListProps> = ({
-    services,
-    onSelectService
-}) => {
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1,
-                duration: 0.6,
-                ease: [0.6, -0.05, 0.01, 0.99]
+const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange }) => {
+    const getPageNumbers = () => {
+        const pages = [];
+        const maxVisiblePages = 5;
+
+        if (totalPages <= maxVisiblePages) {
+            for (let i = 1; i <= totalPages; i++) {
+                pages.push(i);
+            }
+        } else {
+            if (currentPage <= 3) {
+                for (let i = 1; i <= 4; i++) pages.push(i);
+                pages.push(-1); // Separator
+                pages.push(totalPages);
+            } else if (currentPage >= totalPages - 2) {
+                pages.push(1);
+                pages.push(-1); // Separator
+                for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+            } else {
+                pages.push(1);
+                pages.push(-1); // Separator
+                for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+                pages.push(-1); // Separator
+                pages.push(totalPages);
             }
         }
-    };
 
-    const itemVariants = {
-        hidden: { y: 20, opacity: 0 },
-        visible: {
-            y: 0,
-            opacity: 1,
-            transition: {
-                type: "spring",
-                stiffness: 100,
-                damping: 15
-            }
-        }
+        return pages;
     };
-
-    const getCriticalityData = (criticality: string) => {
-        switch (criticality?.toLowerCase()) {
-            case 'critique':
-                return {
-                    color: 'bg-red-50 text-red-700 border-red-200',
-                    badgeColor: 'bg-gradient-to-r from-red-600 to-red-700',
-                    hoverColor: 'group-hover:bg-red-100',
-                    highlightColor: 'bg-red-700/5',
-                    icon: <AlertCircle className="w-4 h-4" />,
-                    label: 'Criticité Critique',
-                    progressColor: 'from-red-500 to-red-600'
-                };
-            case 'haute':
-                return {
-                    color: 'bg-orange-50 text-orange-700 border-orange-200',
-                    badgeColor: 'bg-gradient-to-r from-orange-500 to-orange-600',
-                    hoverColor: 'group-hover:bg-orange-100',
-                    highlightColor: 'bg-orange-700/5',
-                    icon: <Shield className="w-4 h-4" />,
-                    label: 'Criticité Haute',
-                    progressColor: 'from-orange-500 to-orange-600'
-                };
-            case 'moyenne':
-                return {
-                    color: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-                    badgeColor: 'bg-gradient-to-r from-yellow-500 to-yellow-600',
-                    hoverColor: 'group-hover:bg-yellow-100',
-                    highlightColor: 'bg-yellow-700/5',
-                    icon: <Shield className="w-4 h-4" />,
-                    label: 'Criticité Moyenne',
-                    progressColor: 'from-yellow-500 to-yellow-600'
-                };
-            case 'basse':
-                return {
-                    color: 'bg-green-50 text-green-700 border-green-200',
-                    badgeColor: 'bg-gradient-to-r from-green-500 to-green-600',
-                    hoverColor: 'group-hover:bg-green-100',
-                    highlightColor: 'bg-green-700/5',
-                    icon: <CheckCircle2 className="w-4 h-4" />,
-                    label: 'Criticité Basse',
-                    progressColor: 'from-green-500 to-green-600'
-                };
-            default:
-                return {
-                    color: 'bg-gray-50 text-gray-700 border-gray-200',
-                    badgeColor: 'bg-gradient-to-r from-gray-600 to-gray-700',
-                    hoverColor: 'group-hover:bg-gray-100',
-                    highlightColor: 'bg-gray-700/5',
-                    icon: <Shield className="w-4 h-4" />,
-                    label: 'Criticité Non définie',
-                    progressColor: 'from-gray-500 to-gray-600'
-                };
-        }
-    };
-
-    if (services.length === 0) {
-        return (
-            <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: [0.6, -0.05, 0.01, 0.99] }}
-                className="text-center py-24 bg-white rounded-2xl shadow-xl border border-neutral-100"
-            >
-                <div className="flex flex-col items-center justify-center space-y-6">
-                    <motion.div
-                        className="p-6 rounded-full bg-neutral-50 shadow-inner"
-                        animate={{
-                            scale: [1, 1.1, 1],
-                            rotate: [0, 10, -10, 0]
-                        }}
-                        transition={{
-                            duration: 2,
-                            ease: "easeInOut",
-                            repeat: Infinity,
-                            repeatDelay: 1
-                        }}
-                    >
-                        <Search className="w-12 h-12 text-neutral-400" />
-                    </motion.div>
-                    <div className="space-y-2">
-                        <h3 className="text-2xl font-bold text-neutral-800">Aucun service trouvé</h3>
-                        <p className="text-neutral-500 max-w-md mx-auto">
-                            Aucun service ne correspond à votre recherche. Veuillez modifier vos critères et réessayer.
-                        </p>
-                    </div>
-                </div>
-            </motion.div>
-        );
-    }
 
     return (
-        <motion.div
-            className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-        >
-            <AnimatePresence>
-                {services.map((service) => {
-                    const criticalityData = getCriticalityData(service.criticality);
+        <div className="flex items-center justify-center space-x-2 mt-8">
+            <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`p-2 rounded-lg ${
+                    currentPage === 1
+                        ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                        : 'bg-white text-primary-600 hover:bg-primary-50 border border-primary-200'
+                }`}
+            >
+                <ChevronLeft className="w-5 h-5" />
+            </motion.button>
 
-                    return (
-                        <motion.div
-                            key={service.id}
-                            variants={itemVariants}
-                            whileHover={{
-                                y: -8,
-                                transition: { duration: 0.2 }
-                            }}
-                            className={clsx(
-                                "group bg-white rounded-2xl border border-neutral-200 overflow-hidden transition-all cursor-pointer",
-                                "hover:border-primary-300 hover:shadow-2xl hover:shadow-primary-500/10 relative"
-                            )}
-                            onClick={() => onSelectService(service)}
+            {getPageNumbers().map((pageNum, index) => (
+                <React.Fragment key={index}>
+                    {pageNum === -1 ? (
+                        <span className="px-4 py-2">...</span>
+                    ) : (
+                        <motion.button
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => onPageChange(pageNum)}
+                            className={`px-4 py-2 rounded-lg font-medium ${
+                                currentPage === pageNum
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-white text-primary-600 hover:bg-primary-50 border border-primary-200'
+                            }`}
                         >
-                            {/* Criticality indicator line at top */}
-                            <div className={`h-2 w-full ${criticalityData.badgeColor}`}></div>
+                            {pageNum}
+                        </motion.button>
+                    )}
+                </React.Fragment>
+            ))}
 
-                            <div className="p-8 space-y-6">
-                                {/* Header with name and badge */}
-                                <div className="flex items-start justify-between">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center space-x-3">
-                                            <h2 className="font-bold text-2xl text-neutral-900 group-hover:text-primary-700 transition-colors">
-                                                {service.name}
-                                            </h2>
-                                            <span className="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-sm font-medium tracking-wide">
-                                                {service.trigramme}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${criticalityData.color} shadow-sm`}>
-                                                {criticalityData.icon}
-                                                <span className="ml-1.5 capitalize">{service.criticality || 'Non définie'}</span>
-                                            </span>
-
-                                            {service.bridgeCommunication && (
-                                                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
-                                                    <GitBranch className="w-3.5 h-3.5 mr-1.5" />
-                                                    Bridge
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200 shadow-sm">
-                                        v{service.version || '1.0'}
-                                    </span>
-                                </div>
-
-                                {/* Description section */}
-                                <div className={`p-4 rounded-xl ${criticalityData.highlightColor} border border-${criticalityData.color.split(' ')[1]} backdrop-blur-sm`}>
-                                    <p className="text-neutral-700 line-clamp-2 leading-relaxed">
-                                        {service.description}
-                                    </p>
-                                </div>
-
-                                {/* Team information */}
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <h4 className="text-xs font-bold uppercase text-neutral-500 tracking-wider flex items-center">
-                                            <Activity className="w-3.5 h-3.5 mr-1.5" />
-                                            Équipe
-                                        </h4>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="h-9 w-9 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 shadow-sm">
-                                                    <User className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <span className="text-xs text-neutral-500 block">PO/CoEDev</span>
-                                                    <span className="font-semibold text-neutral-900">{service.poCoedev || 'N/A'}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center space-x-3">
-                                                <div className="h-9 w-9 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 shadow-sm">
-                                                    <Code className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <span className="text-xs text-neutral-500 block">Techlead</span>
-                                                    <span className="font-semibold text-neutral-900">{service.techlead || 'N/A'}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Technical information */}
-                                    <div className="space-y-4">
-                                        <h4 className="text-xs font-bold uppercase text-neutral-500 tracking-wider flex items-center">
-                                            <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
-                                            Statut Technique
-                                        </h4>
-                                        <div className="space-y-3">
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm font-medium text-neutral-700">Java 17</span>
-                                                    <span className={`text-xs font-semibold ${service.java17Migrated ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {service.java17Migrated ? 'Migré' : 'Non migré'}
-                                                    </span>
-                                                </div>
-                                                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
-                                                    <motion.div
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: service.java17Migrated ? '100%' : '0%' }}
-                                                        transition={{ duration: 1, ease: "easeOut" }}
-                                                        className={`h-full rounded-full bg-gradient-to-r ${service.java17Migrated ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600'}`}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm font-medium text-neutral-700">Sonarization</span>
-                                                    <span className={`text-xs font-semibold ${service.sonarized ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {service.sonarized ? 'Sonarisé' : 'Non sonarisé'}
-                                                    </span>
-                                                </div>
-                                                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
-                                                    <motion.div
-                                                        initial={{ width: 0 }}
-                                                        animate={{ width: service.sonarized ? '100%' : '0%' }}
-                                                        transition={{ duration: 1, ease: "easeOut" }}
-                                                        className={`h-full rounded-full bg-gradient-to-r ${service.sonarized ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600'}`}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Footer */}
-                                <div className="pt-4 border-t border-neutral-100">
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex items-center text-neutral-500 text-xs">
-                                            <Calendar className="w-3.5 h-3.5 mr-1.5" />
-                                            Mis à jour le {new Date().toLocaleDateString('fr-FR', {
-                                                day: '2-digit',
-                                                month: '2-digit',
-                                                year: 'numeric'
-                                            })}
-                                        </div>
-                                        <button className="text-primary-600 font-medium text-sm flex items-center group-hover:text-primary-700">
-                                            Détails
-                                            <ChevronRight className="w-4 h-4 ml-1 transform transition-transform group-hover:translate-x-1" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </motion.div>
-                    );
-                })}
-            </AnimatePresence>
-        </motion.div>
+            <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`p-2 rounded-lg ${
+                    currentPage === totalPages
+                        ? 'bg-neutral-100 text-neutral-400 cursor-not-allowed'
+                        : 'bg-white text-primary-600 hover:bg-primary-50 border border-primary-200'
+                }`}
+            >
+                <ChevronRight className="w-5 h-5" />
+            </motion.button>
+        </div>
     );
 };
 
-export default ServicesList;
+export default Pagination;
+
+
+
+
+---------------------
+
+
+
+import { useState, useEffect } from 'react';
+import { ChevronRight, Home, Search, Globe, Code, Book, Terminal, Database, ArrowRight, ExternalLink } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import HeaderDoc from "../components/documentation/HeaderDoc.tsx";
+import MobileMenu from "../components/documentation/MobileMenu.tsx";
+import ServiceDocumentationContainer from "../components/documentation/ServiceDocumentationContainer.tsx";
+import TrigrammeSelect from "../components/documentation/TrigrammeSelect.tsx";
+import ServicesList from "../components/documentation/ServicesList.tsx";
+import Pagination from "../components/documentation/Pagination.tsx";
+
+import { APIService } from '../types/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTrigrammes } from "../hooks/apis/useTrigrammes.ts";
+import { useServicesByTrigramme } from "../hooks/apis/useServicesByTrigramme.ts";
+import { useService } from "../hooks/apis/useService.ts";
+import { useAllServices } from "../hooks/apis/useAllServices.ts";
+import { Footer } from "../components/commons/Footer.tsx";
+
+export function APIDocumentation() {
+    const [selectedTrigramme, setSelectedTrigramme] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+    const [scrolled, setScrolled] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 9;
+
+    // Fetch data using custom hooks
+    const { data: trigrammes = [], isLoading: trigrammesLoading } = useTrigrammes();
+    const { data: servicesForTrigramme = [], isLoading: servicesLoading } = useServicesByTrigramme(selectedTrigramme);
+    const { data: selectedService, isLoading: serviceDetailLoading } = useService(selectedServiceId);
+    const { data: allServices = [], isLoading: allServicesLoading } = useAllServices();
+
+    const queryClient = useQueryClient();
+
+    // Handle scroll effect
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 20);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
+    // Filter and paginate services
+    const filteredServices = (selectedTrigramme ? servicesForTrigramme : allServices).filter(service => {
+        const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            service.description.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesSearch;
+    });
+
+    const totalPages = Math.ceil(filteredServices.length / itemsPerPage);
+    const paginatedServices = filteredServices.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    // Reset page when changing filters
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedTrigramme, searchTerm]);
+
+    const toggleMobileMenu = () => {
+        setMobileMenuOpen(!mobileMenuOpen);
+    };
+
+    const handleServiceSelection = (service: APIService) => {
+        setSelectedServiceId(service.id);
+        queryClient.prefetchQuery({
+            queryKey: ['service', service.id],
+            queryFn: () => service
+        });
+    };
+
+    const resetSelection = () => {
+        setSelectedServiceId(null);
+        setSelectedTrigramme(null);
+    };
+
+    const backToTrigrammeList = () => {
+        setSelectedServiceId(null);
+        setSelectedTrigramme(null);
+    };
+
+    const backToServicesList = () => {
+        setSelectedServiceId(null);
+    };
+
+    const LoadingSpinner = () => (
+        <div className="flex flex-col items-center justify-center py-10">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-200 border-t-primary-600"></div>
+            <p className="mt-4 text-primary-600 font-medium">Chargement en cours...</p>
+        </div>
+    );
+
+    const QuickActionCard = ({ icon: Icon, title, description, onClick }: any) => (
+        <motion.button
+            onClick={onClick}
+            className="group relative overflow-hidden bg-white p-6 rounded-2xl border border-neutral-200 hover:border-primary-300 transition-all duration-300"
+            whileHover={{ y: -5, scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+        >
+            <div className="relative z-10">
+                <div className="mb-4 inline-flex p-3 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl">
+                    <Icon className="h-6 w-6 text-primary-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-neutral-900 mb-2">{title}</h3>
+                <p className="text-sm text-neutral-600">{description}</p>
+                <div className="mt-4 inline-flex items-center text-primary-600 text-sm font-medium">
+                    En savoir plus
+                    <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </div>
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-br from-primary-50/0 to-primary-100/0 group-hover:from-primary-50/50 group-hover:to-primary-100/50 transition-all duration-500" />
+        </motion.button>
+    );
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
+            {/* Header avec effet de scroll */}
+            <motion.div
+                className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+                    scrolled ? 'bg-white/80 backdrop-blur-lg shadow-lg' : ''
+                }`}
+            >
+                <HeaderDoc resetSelection={resetSelection} toggleMobileMenu={toggleMobileMenu} />
+            </motion.div>
+
+            <MobileMenu
+                mobileMenuOpen={mobileMenuOpen}
+                toggleMobileMenu={toggleMobileMenu}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedTrigramme={selectedTrigramme}
+                setSelectedTrigramme={setSelectedTrigramme}
+                selectedService={selectedService || null}
+                setSelectedService={handleServiceSelection}
+                trigrammes={trigrammes}
+                filteredServices={filteredServices}
+            />
+
+            <main className="pt-20">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={selectedServiceId ? 'service' : (selectedTrigramme ? 'trigramme' : 'home')}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="container mx-auto px-4 py-8"
+                    >
+                        {selectedService ? (
+                            // Vue détaillée du service
+                            <div className="max-w-7xl mx-auto">
+                                <motion.nav
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mb-8 flex items-center space-x-2 text-sm bg-white/50 backdrop-blur-lg p-4 rounded-2xl border border-neutral-200/50"
+                                >
+                                    <motion.button
+                                        whileHover={{ scale: 1.1, rotate: -5 }}
+                                        whileTap={{ scale: 0.9 }}
+                                        onClick={backToTrigrammeList}
+                                        className="text-primary-500 hover:text-primary-700"
+                                    >
+                                        <Home className="h-5 w-5" />
+                                    </motion.button>
+                                    <ChevronRight className="h-4 w-4 text-neutral-400" />
+                                    <motion.span
+                                        whileHover={{ scale: 1.05 }}
+                                        className="text-primary-500 hover:text-primary-700 cursor-pointer font-medium"
+                                        onClick={backToServicesList}
+                                    >
+                                        {selectedService.trigramme}
+                                    </motion.span>
+                                    <ChevronRight className="h-4 w-4 text-neutral-400" />
+                                    <span className="font-medium text-secondary-900">{selectedService.name}</span>
+                                </motion.nav>
+
+                                {serviceDetailLoading ? (
+                                    <LoadingSpinner />
+                                ) : (
+                                    <ServiceDocumentationContainer service={selectedService} />
+                                )}
+                            </div>
+                        ) : (
+                            <div className="max-w-7xl mx-auto">
+                                <motion.div
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 mb-12"
+                                >
+                                    <div>
+                                        <h1 className="text-4xl font-bold text-secondary-900">
+                                            {selectedTrigramme ? (
+                                                <>
+                                                    Services <span className="bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-700">{selectedTrigramme}</span>
+                                                </>
+                                            ) : (
+                                                "Tous les Services"
+                                            )}
+                                        </h1>
+                                        <p className="mt-2 text-neutral-600">
+                                            {selectedTrigramme
+                                                ? `Explorez les services disponibles pour le trigramme ${selectedTrigramme}`
+                                                : "Explorez tous les services disponibles"}
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-96">
+                                        <motion.div
+                                            className="relative"
+                                            whileHover={{ scale: 1.02 }}
+                                            whileFocus={{ scale: 1.02 }}
+                                        >
+                                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                <Search className="h-5 w-5 text-primary-500" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                placeholder="Rechercher un service..."
+                                                className="w-full pl-12 pr-4 py-4 bg-white/80 backdrop-blur-lg border border-neutral-200 rounded-2xl focus:ring-primary-500 focus:border-primary-500 shadow-lg"
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                            />
+                                        </motion.div>
+                                    </div>
+                                </motion.div>
+
+                                {/* Trigramme selector */}
+                                <div className="mb-8">
+                                    <TrigrammeSelect
+                                        trigrammes={trigrammes}
+                                        selectedTrigramme={selectedTrigramme}
+                                        setSelectedTrigramme={setSelectedTrigramme}
+                                        isLoading={trigrammesLoading}
+                                    />
+                                </div>
+
+                                {(servicesLoading || allServicesLoading) ? (
+                                    <LoadingSpinner />
+                                ) : (
+                                    <>
+                                        <ServicesList
+                                            services={paginatedServices}
+                                            selectedService={selectedService ?? null}
+                                            onSelectService={handleServiceSelection}
+                                        />
+                                        {totalPages > 1 && (
+                                            <Pagination
+                                                currentPage={currentPage}
+                                                totalPages={totalPages}
+                                                onPageChange={setCurrentPage}
+                                            />
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
+            </main>
+
+            <Footer />
+        </div>
+    );
+}
+
+export default APIDocumentation;
