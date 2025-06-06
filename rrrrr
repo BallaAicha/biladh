@@ -1,0 +1,279 @@
+package com.docmanager.dto.apis.entities;
+
+import jakarta.persistence.*;
+import lombok.Data;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Data
+@Table(name = "api_service")
+public class APIService {
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private UUID id;
+
+    @Column(nullable = false)
+    private String name;
+
+    @Column(nullable = false, length = 3)
+    private String trigramme;
+
+    private String description;
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "infrastructure_id")
+    private Infrastructure infrastructure;
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "data_sources_id")
+    private DataSources dataSources;
+
+    @Column(name = "database_schema")
+    private String databaseSchema;
+
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ClientConsumer> clientConsumers;
+
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Consumes> consumes;
+
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ConsumedBy> consumedBy;
+
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Endpoint> endpoints;
+
+    @CreationTimestamp
+    @Column(name = "created_at")
+    private ZonedDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private ZonedDateTime updatedAt;
+
+    // Nouveaux attributs
+    @Column(name = "bridge_communication")
+    private boolean bridgeCommunication;
+
+    @Column(name = "criticality")
+    private String criticality;
+
+    @Column(name = "po_coedev")
+    private String poCoedev;
+
+    @Column(name = "techlead")
+    private String techlead;
+
+    @Column(name = "java17_migrated")
+    private boolean java17Migrated;
+
+    @Column(name = "sonarized")
+    private boolean sonarized;
+
+    @Column(name = "sonar_report_url")
+    private String sonarReportUrl;
+
+    @Column(name = "version")
+    private String version;
+
+    @Column(name = "jfrog_migrated")
+    private boolean jfrogMigrated;
+
+    @Column(name = "github_url")
+    private String githubUrl;
+
+    @Column(name = "development_status")
+    private String developmentStatus; // "inProgress" or "Production"
+
+    @Column(name = "spring_version")
+    private String springVersion;
+
+    @Column(name = "services_count_by_trigramme")
+    private Integer servicesCountByTrigramme;
+
+    @Column(name = "bridge_name")
+    private String bridgeName;
+
+    @Column(name = "documented_by")
+    private String documentedBy;
+
+    @Column(name = "is_documented")
+    private boolean isDocumented;
+
+    @Column(name = "published_on_skies")
+    private boolean publishedOnSkies;
+
+    @Column(name = "deployed_on_dev")
+    private boolean deployedOnDev;
+
+    @Column(name = "migration_tested_on_dev")
+    private boolean migrationTestedOnDev;
+
+}
+------------------------------------------------------
+package com.docmanager.dto.apis;
+
+import jakarta.persistence.Column;
+import lombok.Data;
+
+import java.util.List;
+import java.util.UUID;
+
+@Data
+public class APIServiceDTO {
+    private UUID id;
+    private String name;
+    private String trigramme;
+    private String description;
+
+    private  boolean bridgeCommunication;
+    private String criticality;
+    private String poCoeDev;
+    private String techlead;
+    private boolean java17Migrated;
+    private boolean sonarized;
+    private String sonarReportUrl;
+    private String version;
+
+    private boolean jfrogMigrated;
+    private String githubUrl;
+    private String developmentStatus;
+    private String springVersion;
+    private Integer servicesCountByTrigramme;
+    private String bridgeName;
+    private String documentedBy;
+    private boolean isDocumented;
+    private boolean publishedOnSkies;
+    private boolean deployedOnDev;
+    private boolean migrationTestedOnDev;
+
+    private InfrastructureDTO infrastructure;
+    private DataSourcesDTO dataSources;
+    private List<String> clientConsumers;
+    private List<String> consumes;
+    private List<String> consumedBy;
+    private List<EndpointDTO> endpoints;
+    private String databaseSchema;
+}
+
+
+-------------------------------------------------------
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="add-new-columns-to-api-service" author="docmanager">
+        <addColumn tableName="api_service">
+            <column name="jfrog_migrated" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="github_url" type="varchar(255)"/>
+            <column name="development_status" type="varchar(20)"/>
+            <column name="spring_version" type="varchar(50)"/>
+            <column name="services_count_by_trigramme" type="int"/>
+            <column name="bridge_name" type="varchar(100)"/>
+            <column name="documented_by" type="varchar(100)"/>
+            <column name="is_documented" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="published_on_skies" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="deployed_on_dev" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+            <column name="migration_tested_on_dev" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+</databaseChangeLog>
+
+--------------------------------------------------------
+
+{
+  "name": "Authentication Banking Service",
+  "trigramme": "ABB",
+  "description": "Service central d'authentification pour toutes les applications bancaires avec support OAuth2, JWT et MFA",
+  "bridgeCommunication": true,
+  "criticality": "Critique",
+  "poCoedev": "Jean Dupont",
+  "techlead": "Marie Martin",
+  "java17Migrated": true,
+  "sonarized": true,
+  "sonarReportUrl": "https://sonar.bankingsolutions.com/dashboard?id=authentication-service",
+  "version": "2.5.0",
+  "jfrogMigrated": true,
+  "githubUrl": "https://github.com/bankingsolutions/authentication-service",
+  "developmentStatus": "Production",
+  "springVersion": "3.1.0",
+  "servicesCountByTrigramme": 1,
+  "bridgeName": "API Gateway Bridge",
+  "documentedBy": "Marie Martin",
+  "isDocumented": true,
+  "publishedOnSkies": true,
+  "deployedOnDev": true,
+  "migrationTestedOnDev": true,
+  "infrastructure": {
+    "urlInt": "https://int-auth.bankingsolutions.com",
+    "urlUat": "https://uat-auth.bankingsolutions.com",
+    "urlOat": "https://oat-auth.bankingsolutions.com",
+    "urlProd": "https://auth.bankingsolutions.com"
+  },
+  "dataSources": {
+    "rabbitMQ": true,
+    "commonDB": false,
+    "dedicatedDB": true,
+    "s3": false
+  },
+  "clientConsumers": [
+    "MobileBanking",
+    "WebPortal",
+    "ATMInterface",
+    "BranchSystemApp"
+  ],
+  "consumes": [
+    "DirectoryService",
+    "BiometricValidationAPI",
+    "AuditLogger"
+  ],
+  "consumedBy": [
+    "LoanProcessingSystem",
+    "AccountManagementSystem",
+    "CardIssuanceService",
+    "CustomerPortal"
+  ],
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v2/auth/login",
+      "curl": "curl -X POST https://auth.bankingsolutions.com/api/v2/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"customer123\",\"password\":\"securePass\",\"deviceId\":\"MOB-IOS-12345\"}'",
+      "expectedResponse": "{\"accessToken\":\"eyJhbGciOiJS...\",\"refreshToken\":\"eyR2eXAiOi...\",\"expiresIn\":1800,\"userProfile\":{\"id\":\"U98765\",\"role\":\"CUSTOMER\",\"lastLogin\":\"2023-10-17T08:45:23Z\"}}",
+      "description": "Authentification d'un client bancaire et génération des tokens d'accès"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/auth/mfa/verify",
+      "curl": "curl -X POST https://auth.bankingsolutions.com/api/v2/auth/mfa/verify -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJS...' -d '{\"mfaCode\":\"123456\",\"mfaType\":\"SMS\"}'",
+      "expectedResponse": "{\"verified\":true,\"sessionToken\":\"eyJhbGcRTY...\",\"sessionExpiry\":\"2023-10-17T10:45:23Z\"}",
+      "description": "Vérification de l'authentification à deux facteurs"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v2/auth/token/refresh",
+      "curl": "curl -X POST https://auth.bankingsolutions.com/api/v2/auth/token/refresh -H 'Content-Type: application/json' -d '{\"refreshToken\":\"eyR2eXAiOi...\"}'",
+      "expectedResponse": "{\"accessToken\":\"eyJuZXdh...\",\"expiresIn\":1800}",
+      "description": "Renouvellement du token d'accès à l'aide du token de rafraîchissement"
+    }
+  ],
+  "databaseSchema": "banking_auth_schema"
+}
