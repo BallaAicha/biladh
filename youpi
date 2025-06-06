@@ -1,172 +1,196 @@
-import React, { useMemo } from 'react';
-import { motion } from 'framer-motion';
-import { Activity, Server, Shield, Code, Clock, CheckCircle, AlertTriangle, Database, Network } from 'lucide-react';
+const [formData, setFormData] = useState({
+    name: "",
+    trigramme: "",
+    description: "",
+    bridgeCommunication: false,
+    criticality: "Faible",
+    poCoedev: "",
+    techlead: "",
+    java17Migrated: false,
+    sonarized: false,
+    sonarReportUrl: "",
+    version: "",
+    jfrogMigrated: false, // Nouveau
+    githubUrl: "", // Nouveau
+    developmentStatus: "inProgress", // Nouveau
+    springVersion: "", // Nouveau
+    servicesCountByTrigramme: 0, // Nouveau
+    bridgeName: "", // Nouveau
+    documentedBy: "", // Nouveau
+    isDocumented: false, // Nouveau
+    publishedOnSkies: false, // Nouveau
+    deployedOnDev: false, // Nouveau
+    migrationTestedOnDev: false, // Nouveau
+    infrastructure: {
+        urlInt: "",
+        urlUat: "",
+        urlOat: "",
+        urlProd: ""
+    },
+    dataSources: {
+        rabbitMQ: false,
+        commonDB: false,
+        dedicatedDB: false,
+        s3: false
+    },
+    clientConsumers: [""],
+    consumes: [""],
+    consumedBy: [""],
+    endpoints: [{
+        method: "GET",
+        path: "",
+        curl: "",
+        expectedResponse: "",
+        description: ""
+    }],
+    databaseSchema: ""
+});
 
-const ServiceStatistics: React.FC<{ services: APIService[] }> = ({ services }) => {
-  const stats = useMemo(() => {
-    // Calculer les statistiques à partir des services
-    const totalServices = services.length;
-    const productionServices = services.filter(s => s.developmentStatus === 'Production').length;
-    const inProgressServices = services.filter(s => s.developmentStatus === 'inProgress').length;
-    const documentedServices = services.filter(s => s.isDocumented).length;
-    const java17Services = services.filter(s => s.java17Migrated).length;
-    const bridgeServices = services.filter(s => s.bridgeCommunication).length;
-    const criticalServices = services.filter(s => s.criticality === 'Critique').length;
 
-    // Calculer le pourcentage de migration Java 17
-    const java17Percentage = Math.round((java17Services / totalServices) * 100);
 
-    // Calculer le pourcentage de documentation
-    const documentationPercentage = Math.round((documentedServices / totalServices) * 100);
-
-    return [
-      {
-        id: 'total-services',
-        label: 'Services Totaux',
-        value: totalServices,
-        icon: <Server className="w-6 h-6" />,
-        color: 'blue',
-        trend: '+5% ce mois',
-        detail: `${productionServices} en prod, ${inProgressServices} en dev`
-      },
-      {
-        id: 'critical-services',
-        label: 'Services Critiques',
-        value: criticalServices,
-        icon: <Shield className="w-6 h-6" />,
-        color: 'red',
-        trend: 'Haute priorité',
-        detail: `${Math.round((criticalServices / totalServices) * 100)}% du total`
-      },
-      {
-        id: 'documentation',
-        label: 'Documentation',
-        value: `${documentationPercentage}%`,
-        icon: <Code className="w-6 h-6" />,
-        color: 'green',
-        trend: documentationPercentage === 100 ? 'Complète' : 'En progression',
-        detail: `${documentedServices} services documentés`
-      },
-      {
-        id: 'java-migration',
-        label: 'Migration Java 17',
-        value: `${java17Percentage}%`,
-        icon: <Activity className="w-6 h-6" />,
-        color: java17Percentage >= 80 ? 'green' : 'orange',
-        trend: 'En cours',
-        detail: `${java17Services} services migrés`
-      }
-    ];
-  }, [services]);
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 -mt-20">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: index * 0.1 }}
-            className="bg-white rounded-xl shadow-lg shadow-secondary-900/5 overflow-hidden p-6 hover:shadow-xl hover:shadow-secondary-900/10 transition-all duration-300"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`bg-${stat.color}-100 p-3 rounded-lg`}>
-                <div className={`text-${stat.color}-600`}>
-                  {stat.icon}
-                </div>
-              </div>
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.5 + index * 0.1 }}
-                className={`px-2 py-1 rounded-full text-xs font-medium bg-${stat.color}-100 text-${stat.color}-700`}
-              >
-                {stat.trend}
-              </motion.div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-medium text-neutral-500">{stat.label}</h3>
-              <div className="mt-2 flex items-end justify-between">
-                <p className="text-2xl font-bold text-neutral-800">
-                  <AnimatedNumber value={parseInt(stat.value)} />
-                  {isNaN(parseInt(stat.value)) ? stat.value : ''}
-                </p>
-                <span className="text-xs text-neutral-500">{stat.detail}</span>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <div className="w-full h-1 bg-neutral-100 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: stat.value }}
-                  transition={{ duration: 1, delay: 0.8 + index * 0.1 }}
-                  className={`h-full bg-${stat.color}-500 rounded-full`}
-                />
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Section des indicateurs supplémentaires */}
-      <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        {[
-          {
-            icon: <Database className="w-4 h-4" />,
-            label: 'Services avec DB dédiée',
-            value: services.filter(s => s?.dataSources?.dedicatedDB).length
-          },
-          {
-            icon: <Network className="w-4 h-4" />,
-            label: 'Bridges actifs',
-            value: bridgeServices
-          },
-          {
-            icon: <CheckCircle className="w-4 h-4" />,
-            label: 'Publiés sur Skies',
-            value: services.filter(s => s.publishedOnSkies).length
-          },
-          {
-            icon: <AlertTriangle className="w-4 h-4" />,
-            label: 'En attente de migration',
-            value: totalServices - java17Services
-          },
-          {
-            icon: <Clock className="w-4 h-4" />,
-            label: 'Déployés sur DEV',
-            value: services.filter(s => s.deployedOnDev).length
-          }
-        ].map((indicator, index) => (
-          <motion.div
-            key={indicator.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 1 + index * 0.1 }}
-            className="bg-white/50 backdrop-blur-sm rounded-lg p-3 flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow duration-300"
-          >
-            <div className="text-primary-600">
-              {indicator.icon}
-            </div>
-            <div>
-              <p className="text-xs text-neutral-500">{indicator.label}</p>
-              <p className="text-sm font-semibold text-neutral-800">{indicator.value}</p>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+-----------------
+{/* Statut et Configuration */}
+<div className="space-y-4">
+    <h3 className="text-lg font-semibold text-neutral-800">Statut et Configuration</h3>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Statut de développement</label>
+            <select
+                name="developmentStatus"
+                value={formData.developmentStatus}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+            >
+                <option value="inProgress">En cours</option>
+                <option value="Production">Production</option>
+            </select>
+        </div>
+        <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Version Spring</label>
+            <input
+                type="text"
+                name="springVersion"
+                value={formData.springVersion}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                placeholder="ex: 3.2.0"
+            />
+        </div>
     </div>
-  );
-};
 
-export default ServiceStatistics;
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">URL GitHub</label>
+            <input
+                type="text"
+                name="githubUrl"
+                value={formData.githubUrl}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+            />
+        </div>
+        <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Nom du Bridge</label>
+            <input
+                type="text"
+                name="bridgeName"
+                value={formData.bridgeName}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+            />
+        </div>
+    </div>
+</div>
 
+{/* État de la documentation et déploiement */}
+<div className="space-y-4">
+    <h3 className="text-lg font-semibold text-neutral-800">Documentation et Déploiement</h3>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center">
+            <input
+                type="checkbox"
+                id="isDocumented"
+                name="isDocumented"
+                checked={formData.isDocumented}
+                onChange={(e) => setFormData({...formData, isDocumented: e.target.checked})}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+            />
+            <label htmlFor="isDocumented" className="ml-2 block text-sm text-neutral-700">Documentation complète</label>
+        </div>
+        <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Documenté par</label>
+            <input
+                type="text"
+                name="documentedBy"
+                value={formData.documentedBy}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+            />
+        </div>
+    </div>
 
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="flex items-center">
+            <input
+                type="checkbox"
+                id="publishedOnSkies"
+                name="publishedOnSkies"
+                checked={formData.publishedOnSkies}
+                onChange={(e) => setFormData({...formData, publishedOnSkies: e.target.checked})}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+            />
+            <label htmlFor="publishedOnSkies" className="ml-2 block text-sm text-neutral-700">Publié sur Skies</label>
+        </div>
+        <div className="flex items-center">
+            <input
+                type="checkbox"
+                id="deployedOnDev"
+                name="deployedOnDev"
+                checked={formData.deployedOnDev}
+                onChange={(e) => setFormData({...formData, deployedOnDev: e.target.checked})}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+            />
+            <label htmlFor="deployedOnDev" className="ml-2 block text-sm text-neutral-700">Déployé sur DEV</label>
+        </div>
+        <div className="flex items-center">
+            <input
+                type="checkbox"
+                id="migrationTestedOnDev"
+                name="migrationTestedOnDev"
+                checked={formData.migrationTestedOnDev}
+                onChange={(e) => setFormData({...formData, migrationTestedOnDev: e.target.checked})}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+            />
+            <label htmlFor="migrationTestedOnDev" className="ml-2 block text-sm text-neutral-700">Migration testée sur DEV</label>
+        </div>
+    </div>
+</div>
 
--------------------------
-import ServiceStatistics from './components/ServiceStatistics';
-
-// Dans votre composant principal
-<ServiceStatistics services={services} />
+{/* Migration et Qualité */}
+<div className="space-y-4">
+    <h3 className="text-lg font-semibold text-neutral-800">Migration et Qualité</h3>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="flex items-center">
+            <input
+                type="checkbox"
+                id="jfrogMigrated"
+                name="jfrogMigrated"
+                checked={formData.jfrogMigrated}
+                onChange={(e) => setFormData({...formData, jfrogMigrated: e.target.checked})}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-neutral-300 rounded"
+            />
+            <label htmlFor="jfrogMigrated" className="ml-2 block text-sm text-neutral-700">Migré vers JFrog</label>
+        </div>
+        <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Nombre de services par trigramme</label>
+            <input
+                type="number"
+                name="servicesCountByTrigramme"
+                value={formData.servicesCountByTrigramme}
+                onChange={handleChange}
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg"
+                min="0"
+            />
+        </div>
+    </div>
+</div>
