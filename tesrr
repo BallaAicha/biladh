@@ -1,0 +1,321 @@
+{
+  "name": "Account Balance Bridge",
+  "trigramme": "ABB",
+  "description": "Nouveau service de gestion des soldes en temps réel avec support des cryptomonnaies",
+  "bridgeCommunication": true,
+  "criticality": "Haute",
+  "poCoedev": "Sophie Lambert",
+  "techlead": "Thomas Bernard",
+  "java17Migrated": false,
+  "sonarized": true,
+  "sonarReportUrl": "https://sonar.bankingsolutions.com/dashboard?id=balance-bridge",
+  "version": "0.8.0-SNAPSHOT",
+  "jfrogMigrated": false,
+  "githubUrl": "https://github.com/bankingsolutions/account-balance-bridge",
+  "developmentStatus": "inProgress",
+  "springVersion": "2.7.0",
+  "servicesCountByTrigramme": 1,
+  "bridgeName": "Transaction Bridge",
+  "documentedBy": null,
+  "isDocumented": false,
+  "publishedOnSkies": false,
+  "deployedOnDev": true,
+  "migrationTestedOnDev": false,
+  "infrastructure": {
+    "urlInt": "https://int-balance.bankingsolutions.com",
+    "urlUat": null,
+    "urlOat": null,
+    "urlProd": null
+  },
+  "dataSources": {
+    "rabbitMQ": true,
+    "commonDB": true,
+    "dedicatedDB": true,
+    "s3": true
+  },
+  "clientConsumers": [
+    "CryptoWallet",
+    "MobileBanking",
+    "InvestmentPlatform"
+  ],
+  "consumes": [
+    "CryptoExchangeAPI",
+    "RealTimeQuotesService",
+    "TransactionProcessor"
+  ],
+  "consumedBy": [
+    "TradingPlatform",
+    "WealthManagementSystem"
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/balances/{accountId}/realtime",
+      "curl": "curl -X GET https://int-balance.bankingsolutions.com/api/v1/balances/ACC123/realtime -H 'Authorization: Bearer token'",
+      "expectedResponse": "{\"balance\":\"1250.75\",\"cryptoBalance\":{\"BTC\":\"0.25\",\"ETH\":\"2.5\"},\"lastUpdate\":\"2024-03-20T14:30:00Z\"}",
+      "description": "Récupération du solde en temps réel incluant les cryptomonnaies"
+    }
+  ],
+  "databaseSchema": "real_time_balance_schema"
+}
+
+
+--------------------------
+{
+  "name": "Innovation Lab Service",
+  "trigramme": "INO",
+  "description": "Service d'expérimentation pour l'intelligence artificielle et le machine learning bancaire",
+  "bridgeCommunication": false,
+  "criticality": "Moyenne",
+  "poCoedev": "Alexandre Dubois",
+  "techlead": "Emma Chen",
+  "java17Migrated": true,
+  "sonarized": true,
+  "sonarReportUrl": "https://sonar.bankingsolutions.com/dashboard?id=innovation-lab",
+  "version": "1.2.0",
+  "jfrogMigrated": true,
+  "githubUrl": "https://github.com/bankingsolutions/innovation-lab",
+  "developmentStatus": "Production",
+  "springVersion": "3.2.0",
+  "servicesCountByTrigramme": 3,
+  "bridgeName": null,
+  "documentedBy": "Emma Chen",
+  "isDocumented": true,
+  "publishedOnSkies": true,
+  "deployedOnDev": true,
+  "migrationTestedOnDev": true,
+  "infrastructure": {
+    "urlInt": "https://int-innovation.bankingsolutions.com",
+    "urlUat": "https://uat-innovation.bankingsolutions.com",
+    "urlOat": "https://oat-innovation.bankingsolutions.com",
+    "urlProd": "https://innovation.bankingsolutions.com"
+  },
+  "dataSources": {
+    "rabbitMQ": false,
+    "commonDB": false,
+    "dedicatedDB": true,
+    "s3": true
+  },
+  "clientConsumers": [
+    "FraudDetectionSystem",
+    "CustomerBehaviorAnalytics",
+    "MarketPredictionTool"
+  ],
+  "consumes": [
+    "DataLakeService",
+    "ModelTrainingPlatform",
+    "GPTIntegrationService"
+  ],
+  "consumedBy": [
+    "RiskAssessmentSystem",
+    "MarketingAutomation",
+    "ProductRecommendationEngine"
+  ],
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v1/ml/predict/credit",
+      "curl": "curl -X POST https://innovation.bankingsolutions.com/api/v1/ml/predict/credit -H 'Content-Type: application/json' -d '{\"customerData\":{}}'",
+      "expectedResponse": "{\"creditScore\":785,\"riskLevel\":\"LOW\",\"recommendedProducts\":[\"PREMIUM_CARD\",\"INVESTMENT_ACCOUNT\"]}",
+      "description": "Prédiction de score de crédit par ML"
+    }
+  ],
+  "databaseSchema": "innovation_ml_schema"
+}
+
+
+----------------------
+{
+  "name": "Fraud Control System",
+  "trigramme": "FCS",
+  "description": "Système de détection et prévention des fraudes en temps réel",
+  "bridgeCommunication": true,
+  "criticality": "Critique",
+  "poCoedev": "Lucas Martin",
+  "techlead": "Sarah Wong",
+  "java17Migrated": true,
+  "sonarized": true,
+  "sonarReportUrl": "https://sonar.bankingsolutions.com/dashboard?id=fraud-control",
+  "version": "3.1.0",
+  "jfrogMigrated": true,
+  "githubUrl": "https://github.com/bankingsolutions/fraud-control-system",
+  "developmentStatus": "Production",
+  "springVersion": "3.1.0",
+  "servicesCountByTrigramme": 2,
+  "bridgeName": "Security Bridge",
+  "documentedBy": "Sarah Wong",
+  "isDocumented": true,
+  "publishedOnSkies": true,
+  "deployedOnDev": true,
+  "migrationTestedOnDev": true,
+  "infrastructure": {
+    "urlInt": "https://int-fraud.bankingsolutions.com",
+    "urlUat": "https://uat-fraud.bankingsolutions.com",
+    "urlOat": "https://oat-fraud.bankingsolutions.com",
+    "urlProd": "https://fraud.bankingsolutions.com"
+  },
+  "dataSources": {
+    "rabbitMQ": true,
+    "commonDB": false,
+    "dedicatedDB": true,
+    "s3": true
+  },
+  "clientConsumers": [
+    "TransactionProcessor",
+    "PaymentGateway",
+    "CardManagementSystem",
+    "ATMNetwork"
+  ],
+  "consumes": [
+    "BlacklistService",
+    "BehaviorAnalytics",
+    "GeolocationAPI",
+    "DeviceFingerprintService"
+  ],
+  "consumedBy": [
+    "RiskManagementDashboard",
+    "AlertingSystem",
+    "ComplianceReporting"
+  ],
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v3/transaction/analyze",
+      "curl": "curl -X POST https://fraud.bankingsolutions.com/api/v3/transaction/analyze -H 'Content-Type: application/json' -d '{\"transactionId\":\"TX123\",\"amount\":1000,\"location\":\"Paris\",\"deviceId\":\"D789\"}'",
+      "expectedResponse": "{\"riskScore\":85,\"fraudProbability\":0.02,\"action\":\"ALLOW\",\"rules\":[\"GEO_CHECK\",\"AMOUNT_LIMIT\",\"DEVICE_TRUST\"]}",
+      "description": "Analyse en temps réel d'une transaction pour détection de fraude"
+    }
+  ],
+  "databaseSchema": "fraud_detection_schema"
+}
+
+
+------------------------
+{
+  "name": "Customer Analytics Network",
+  "trigramme": "CAN",
+  "description": "Plateforme d'analyse comportementale et de segmentation client",
+  "bridgeCommunication": true,
+  "criticality": "Haute",
+  "poCoedev": "Marie Leroy",
+  "techlead": "David Kim",
+  "java17Migrated": true,
+  "sonarized": true,
+  "sonarReportUrl": "https://sonar.bankingsolutions.com/dashboard?id=customer-analytics",
+  "version": "2.0.0",
+  "jfrogMigrated": true,
+  "githubUrl": "https://github.com/bankingsolutions/customer-analytics",
+  "developmentStatus": "Production",
+  "springVersion": "3.0.0",
+  "servicesCountByTrigramme": 4,
+  "bridgeName": "Data Bridge",
+  "documentedBy": "David Kim",
+  "isDocumented": true,
+  "publishedOnSkies": true,
+  "deployedOnDev": true,
+  "migrationTestedOnDev": true,
+  "infrastructure": {
+    "urlInt": "https://int-analytics.bankingsolutions.com",
+    "urlUat": "https://uat-analytics.bankingsolutions.com",
+    "urlOat": "https://oat-analytics.bankingsolutions.com",
+    "urlProd": "https://analytics.bankingsolutions.com"
+  },
+  "dataSources": {
+    "rabbitMQ": true,
+    "commonDB": true,
+    "dedicatedDB": true,
+    "s3": true
+  },
+  "clientConsumers": [
+    "MarketingPlatform",
+    "ProductRecommendation",
+    "CustomerService",
+    "SalesAutomation"
+  ],
+  "consumes": [
+    "TransactionHistory",
+    "CustomerProfile",
+    "InteractionLogs",
+    "SocialMediaAPI"
+  ],
+  "consumedBy": [
+    "CampaignManager",
+    "PersonalizationEngine",
+    "LoyaltyProgram"
+  ],
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v2/customers/{customerId}/insights",
+      "curl": "curl -X GET https://analytics.bankingsolutions.com/api/v2/customers/C456/insights -H 'Authorization: Bearer token'",
+      "expectedResponse": "{\"segment\":\"PREMIUM\",\"lifetimeValue\":75000,\"churnRisk\":0.15,\"nextBestOffer\":[\"INVESTMENT_ACCOUNT\",\"TRAVEL_INSURANCE\"]}",
+      "description": "Analyse complète du profil client avec recommandations"
+    }
+  ],
+  "databaseSchema": "customer_analytics_schema"
+}
+
+
+------------------
+
+{
+  "name": "Blockchain Integration Service",
+  "trigramme": "INO",
+  "description": "Service d'intégration blockchain pour les contrats intelligents et les transactions décentralisées",
+  "bridgeCommunication": true,
+  "criticality": "Moyenne",
+  "poCoedev": "Pierre Dubois",
+  "techlead": "Lisa Chen",
+  "java17Migrated": true,
+  "sonarized": true,
+  "sonarReportUrl": "https://sonar.bankingsolutions.com/dashboard?id=blockchain-integration",
+  "version": "0.5.0",
+  "jfrogMigrated": true,
+  "githubUrl": "https://github.com/bankingsolutions/blockchain-integration",
+  "developmentStatus": "Production",
+  "springVersion": "3.2.0",
+  "servicesCountByTrigramme": 3,
+  "bridgeName": "Blockchain Bridge",
+  "documentedBy": "Lisa Chen",
+  "isDocumented": true,
+  "publishedOnSkies": true,
+  "deployedOnDev": true,
+  "migrationTestedOnDev": true,
+  "infrastructure": {
+    "urlInt": "https://int-blockchain.bankingsolutions.com",
+    "urlUat": "https://uat-blockchain.bankingsolutions.com",
+    "urlOat": "https://oat-blockchain.bankingsolutions.com",
+    "urlProd": "https://blockchain.bankingsolutions.com"
+  },
+  "dataSources": {
+    "rabbitMQ": true,
+    "commonDB": false,
+    "dedicatedDB": true,
+    "s3": true
+  },
+  "clientConsumers": [
+    "SmartContractPlatform",
+    "DigitalAssetManagement",
+    "CrossBorderPayments"
+  ],
+  "consumes": [
+    "EthereumNode",
+    "HyperledgerFabric",
+    "TokenizationService"
+  ],
+  "consumedBy": [
+    "AssetTokenization",
+    "SupplyChainFinance",
+    "TradeFinance"
+  ],
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v1/contracts/deploy",
+      "curl": "curl -X POST https://blockchain.bankingsolutions.com/api/v1/contracts/deploy -H 'Content-Type: application/json' -d '{\"contractType\":\"ESCROW\",\"parties\":[\"0x123...\",\"0x456...\"]}'",
+      "expectedResponse": "{\"contractAddress\":\"0x789...\",\"status\":\"DEPLOYED\",\"transactionHash\":\"0xabc...\"}",
+      "description": "Déploiement d'un contrat intelligent sur la blockchain"
+    }
+  ],
+  "databaseSchema": "blockchain_integration_schema"
+}
