@@ -1,0 +1,421 @@
+import React, { useMemo, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Activity, Server, Shield, Code, Clock, CheckCircle, AlertTriangle, 
+  Database, Network, TrendingUp, BarChart2, Zap, GitBranch, 
+  ExternalLink, Users, Layers
+} from 'lucide-react';
+
+// AnimatedNumber component for smooth number transitions
+const AnimatedNumber: React.FC<{ value: number }> = ({ value }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+  
+  useEffect(() => {
+    // Animate from current value to new value
+    let start = displayValue;
+    const end = value;
+    const duration = 1000; // 1 second
+    const startTime = Date.now();
+    
+    const animateValue = () => {
+      const now = Date.now();
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Easing function for smoother animation
+      const easeOutQuad = (t: number) => t * (2 - t);
+      const currentValue = Math.floor(start + (end - start) * easeOutQuad(progress));
+      
+      setDisplayValue(currentValue);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animateValue);
+      }
+    };
+    
+    requestAnimationFrame(animateValue);
+  }, [value]);
+  
+  return <span>{displayValue}</span>;
+};
+
+// Main component
+const ServiceStatistics: React.FC<{ services: APIService[] }> = ({ services }) => {
+  const stats = useMemo(() => {
+    // Calculate statistics from services
+    const totalServices = services.length;
+    const productionServices = services.filter(s => s.developmentStatus === 'Production').length;
+    const inProgressServices = services.filter(s => s.developmentStatus === 'inProgress').length;
+    const documentedServices = services.filter(s => s.isDocumented).length;
+    const java17Services = services.filter(s => s.java17Migrated).length;
+    const bridgeServices = services.filter(s => s.bridgeCommunication).length;
+    const criticalServices = services.filter(s => s.criticality === 'Critique').length;
+    const sonarizedServices = services.filter(s => s.sonarized).length;
+    const jfrogMigratedServices = services.filter(s => s.jfrogMigrated).length;
+    const publishedOnSkiesServices = services.filter(s => s.publishedOnSkies).length;
+    const deployedOnDevServices = services.filter(s => s.deployedOnDev).length;
+    const withDedicatedDBServices = services.filter(s => s?.dataSources?.dedicatedDB).length;
+    const withRabbitMQServices = services.filter(s => s?.dataSources?.rabbitMQ).length;
+    const withS3Services = services.filter(s => s?.dataSources?.s3).length;
+    
+    // Calculate percentages
+    const java17Percentage = Math.round((java17Services / totalServices) * 100) || 0;
+    const documentationPercentage = Math.round((documentedServices / totalServices) * 100) || 0;
+    const productionPercentage = Math.round((productionServices / totalServices) * 100) || 0;
+    const sonarizedPercentage = Math.round((sonarizedServices / totalServices) * 100) || 0;
+    const jfrogMigratedPercentage = Math.round((jfrogMigratedServices / totalServices) * 100) || 0;
+    
+    // Calculate average connectivity metrics
+    const avgConsumers = services.reduce((sum, service) => sum + (service.clientConsumers?.length || 0), 0) / (totalServices || 1);
+    const avgConsumedBy = services.reduce((sum, service) => sum + (service.consumedBy?.length || 0), 0) / (totalServices || 1);
+    
+    // Calculate criticality distribution
+    const criticalityMap = services.reduce((acc, service) => {
+      const criticality = service.criticality || 'Non définie';
+      acc[criticality] = (acc[criticality] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const highCriticalityCount = criticalityMap['Haute'] || 0;
+    const mediumCriticalityCount = criticalityMap['Moyenne'] || 0;
+    const lowCriticalityCount = criticalityMap['Basse'] || 0;
+    
+    // Calculate trigramme distribution
+    const trigrammeStats = services.reduce((acc, service) => {
+      acc[service.trigramme] = (acc[service.trigramme] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    const uniqueTrigrammes = Object.keys(trigrammeStats).length;
+    
+    return [
+      {
+        id: 'total-services',
+        label: 'Services Totaux',
+        value: totalServices,
+        icon: <Server className="w-6 h-6" />,
+        color: 'blue',
+        trend: `${productionPercentage}% en production`,
+        detail: `${productionServices} en prod, ${inProgressServices} en dev`,
+        progress: productionPercentage,
+        secondaryIcon: <TrendingUp className="w-4 h-4" />,
+        secondaryColor: 'emerald',
+        secondaryText: '+5% ce mois'
+      },
+      {
+        id: 'critical-services',
+        label: 'Services Critiques',
+        value: criticalServices,
+        icon: <Shield className="w-6 h-6" />,
+        color: 'red',
+        trend: 'Haute priorité',
+        detail: `${Math.round((criticalServices / totalServices) * 100)}% du total`,
+        progress: Math.round((criticalServices / totalServices) * 100),
+        secondaryIcon: <AlertTriangle className="w-4 h-4" />,
+        secondaryColor: 'amber',
+        secondaryText: 'Surveillance active'
+      },
+      {
+        id: 'documentation',
+        label: 'Documentation',
+        value: documentationPercentage,
+        suffix: '%',
+        icon: <Code className="w-6 h-6" />,
+        color: 'emerald',
+        trend: documentationPercentage === 100 ? 'Complète' : 'En progression',
+        detail: `${documentedServices} services documentés`,
+        progress: documentationPercentage,
+        secondaryIcon: <CheckCircle className="w-4 h-4" />,
+        secondaryColor: 'emerald',
+        secondaryText: documentationPercentage > 80 ? 'Bonne couverture' : 'À améliorer'
+      },
+      {
+        id: 'java-migration',
+        label: 'Migration Java 17',
+        value: java17Percentage,
+        suffix: '%',
+        icon: <Activity className="w-6 h-6" />,
+        color: java17Percentage >= 80 ? 'emerald' : 'amber',
+        trend: 'En cours',
+        detail: `${java17Services} services migrés`,
+        progress: java17Percentage,
+        secondaryIcon: <Zap className="w-4 h-4" />,
+        secondaryColor: 'blue',
+        secondaryText: `${totalServices - java17Services} restants`
+      }
+    ];
+  }, [services]);
+
+  // Additional metrics for the bottom section
+  const additionalMetrics = useMemo(() => {
+    const totalServices = services.length;
+    const java17Services = services.filter(s => s.java17Migrated).length;
+    const bridgeServices = services.filter(s => s.bridgeCommunication).length;
+    
+    // Calculate trigramme distribution
+    const trigrammeStats = services.reduce((acc, service) => {
+      acc[service.trigramme] = (acc[service.trigramme] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    // Get top trigrammes
+    const topTrigrammes = Object.entries(trigrammeStats)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, count]) => ({ name, count }));
+    
+    return [
+      {
+        icon: <Database className="w-5 h-5" />,
+        label: 'Services avec DB dédiée',
+        value: services.filter(s => s?.dataSources?.dedicatedDB).length,
+        color: 'indigo'
+      },
+      {
+        icon: <Network className="w-5 h-5" />,
+        label: 'Bridges actifs',
+        value: bridgeServices,
+        color: 'violet'
+      },
+      {
+        icon: <ExternalLink className="w-5 h-5" />,
+        label: 'Publiés sur Skies',
+        value: services.filter(s => s.publishedOnSkies).length,
+        color: 'blue'
+      },
+      {
+        icon: <AlertTriangle className="w-5 h-5" />,
+        label: 'En attente de migration',
+        value: totalServices - java17Services,
+        color: 'amber'
+      },
+      {
+        icon: <Clock className="w-5 h-5" />,
+        label: 'Déployés sur DEV',
+        value: services.filter(s => s.deployedOnDev).length,
+        color: 'emerald'
+      },
+      {
+        icon: <GitBranch className="w-5 h-5" />,
+        label: 'Trigrammes actifs',
+        value: Object.keys(trigrammeStats).length,
+        color: 'fuchsia'
+      },
+      {
+        icon: <Layers className="w-5 h-5" />,
+        label: 'Sonarisés',
+        value: services.filter(s => s.sonarized).length,
+        color: 'cyan'
+      },
+      {
+        icon: <Users className="w-5 h-5" />,
+        label: 'Équipes contributrices',
+        value: topTrigrammes.map(t => t.name).join(', '),
+        isText: true,
+        color: 'rose'
+      }
+    ];
+  }, [services]);
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 15
+      }
+    }
+  };
+
+  const progressVariants = {
+    hidden: { width: 0 },
+    visible: (width: number) => ({
+      width: `${width}%`,
+      transition: { 
+        duration: 1.5,
+        ease: "easeOut"
+      }
+    })
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 -mt-20">
+      {/* Header with title and summary */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-xl"
+      >
+        <div className="flex items-center gap-3 mb-2">
+          <BarChart2 className="w-6 h-6" />
+          <h2 className="text-2xl font-bold">Tableau de bord des services</h2>
+        </div>
+        <p className="opacity-90 max-w-3xl">
+          Vue d'ensemble et analyse détaillée de l'écosystème des services API. 
+          Surveillez les métriques clés et identifiez les tendances pour optimiser votre infrastructure.
+        </p>
+      </motion.div>
+
+      {/* Main statistics cards */}
+      <motion.div 
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+      >
+        {stats.map((stat, index) => (
+          <motion.div
+            key={stat.id}
+            variants={itemVariants}
+            custom={index}
+            className="bg-white rounded-xl shadow-xl overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1"
+            style={{
+              backgroundImage: `radial-gradient(circle at 90% 10%, ${stat.color === 'blue' ? 'rgba(59, 130, 246, 0.1)' : 
+                stat.color === 'red' ? 'rgba(239, 68, 68, 0.1)' : 
+                stat.color === 'emerald' ? 'rgba(16, 185, 129, 0.1)' : 
+                'rgba(245, 158, 11, 0.1)'} 10%, transparent 40%)`
+            }}
+          >
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className={`bg-${stat.color === 'blue' ? 'blue' : 
+                  stat.color === 'red' ? 'red' : 
+                  stat.color === 'emerald' ? 'emerald' : 
+                  'amber'}-100 p-3 rounded-lg`}>
+                  <div className={`text-${stat.color === 'blue' ? 'blue' : 
+                    stat.color === 'red' ? 'red' : 
+                    stat.color === 'emerald' ? 'emerald' : 
+                    'amber'}-600`}>
+                    {stat.icon}
+                  </div>
+                </div>
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.5 + index * 0.1, type: "spring", stiffness: 200 }}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium bg-${stat.color === 'blue' ? 'blue' : 
+                    stat.color === 'red' ? 'red' : 
+                    stat.color === 'emerald' ? 'emerald' : 
+                    'amber'}-100 text-${stat.color === 'blue' ? 'blue' : 
+                    stat.color === 'red' ? 'red' : 
+                    stat.color === 'emerald' ? 'emerald' : 
+                    'amber'}-700 flex items-center gap-1.5`}
+                >
+                  {stat.trend}
+                </motion.div>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-medium text-neutral-500">{stat.label}</h3>
+                <div className="mt-2 flex items-end justify-between">
+                  <div className="flex items-baseline">
+                    <p className="text-3xl font-bold text-neutral-800">
+                      <AnimatedNumber value={typeof stat.value === 'string' ? parseInt(stat.value) : stat.value} />
+                      {stat.suffix || ''}
+                    </p>
+                    <div className="ml-2 flex items-center text-xs font-medium text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                      {stat.secondaryIcon}
+                      <span className="ml-1">{stat.secondaryText}</span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-neutral-500">{stat.detail}</span>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
+                  <motion.div
+                    custom={stat.progress}
+                    variants={progressVariants}
+                    className={`h-full rounded-full ${
+                      stat.color === 'blue' ? 'bg-gradient-to-r from-blue-400 to-blue-600' : 
+                      stat.color === 'red' ? 'bg-gradient-to-r from-red-400 to-red-600' : 
+                      stat.color === 'emerald' ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 
+                      'bg-gradient-to-r from-amber-400 to-amber-600'
+                    }`}
+                  />
+                </div>
+                <div className="mt-1 flex justify-between text-xs text-neutral-500">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Additional metrics section with improved design */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="mt-8"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="w-5 h-5 text-indigo-600" />
+          <h3 className="text-lg font-semibold text-neutral-800">Métriques détaillées</h3>
+        </div>
+        
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {additionalMetrics.map((metric, index) => (
+            <motion.div
+              key={metric.label}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.7 + index * 0.1 }}
+              className={`${
+                metric.color === 'indigo' ? 'bg-indigo-50 border-indigo-100' :
+                metric.color === 'violet' ? 'bg-purple-50 border-purple-100' :
+                metric.color === 'blue' ? 'bg-blue-50 border-blue-100' :
+                metric.color === 'amber' ? 'bg-amber-50 border-amber-100' :
+                metric.color === 'emerald' ? 'bg-emerald-50 border-emerald-100' :
+                metric.color === 'fuchsia' ? 'bg-fuchsia-50 border-fuchsia-100' :
+                metric.color === 'cyan' ? 'bg-cyan-50 border-cyan-100' :
+                'bg-rose-50 border-rose-100'
+              } rounded-lg p-4 border flex items-center gap-3 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1`}
+            >
+              <div className={`p-2.5 rounded-lg ${
+                metric.color === 'indigo' ? 'bg-indigo-100 text-indigo-600' :
+                metric.color === 'violet' ? 'bg-purple-100 text-purple-600' :
+                metric.color === 'blue' ? 'bg-blue-100 text-blue-600' :
+                metric.color === 'amber' ? 'bg-amber-100 text-amber-600' :
+                metric.color === 'emerald' ? 'bg-emerald-100 text-emerald-600' :
+                metric.color === 'fuchsia' ? 'bg-fuchsia-100 text-fuchsia-600' :
+                metric.color === 'cyan' ? 'bg-cyan-100 text-cyan-600' :
+                'bg-rose-100 text-rose-600'
+              }`}>
+                {metric.icon}
+              </div>
+              <div>
+                <p className="text-xs text-neutral-600 font-medium">{metric.label}</p>
+                {metric.isText ? (
+                  <p className="text-sm font-bold text-neutral-800">{metric.value}</p>
+                ) : (
+                  <p className="text-xl font-bold text-neutral-800">{metric.value}</p>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+export default ServiceStatistics;
