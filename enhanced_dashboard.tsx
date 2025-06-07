@@ -24,6 +24,42 @@ const APIDashboard: React.FC<APIDashboardProps> = ({ services }) => {
     const productionApis = services.filter(s => s.developmentStatus === 'Production').length;
     const inProgressApis = services.filter(s => s.developmentStatus === 'inProgress').length;
 
+    // Calculate technical health metrics
+    const java17MigratedCount = services.filter(s => s.java17Migrated).length;
+    const java17MigratedPercentage = totalApis > 0 ? Math.round((java17MigratedCount / totalApis) * 100) : 0;
+
+    const sonarizedCount = services.filter(s => s.sonarized).length;
+    const sonarizedPercentage = totalApis > 0 ? Math.round((sonarizedCount / totalApis) * 100) : 0;
+
+    // Calculate documentation metrics
+    const documentedCount = services.filter(s => s.isDocumented).length;
+    const documentedPercentage = totalApis > 0 ? Math.round((documentedCount / totalApis) * 100) : 0;
+
+    // Calculate integration metrics
+    const bridgeCount = services.filter(s => s.bridgeCommunication).length;
+    const bridgePercentage = totalApis > 0 ? Math.round((bridgeCount / totalApis) * 100) : 0;
+
+    // Calculate data source usage
+    const withRabbitMQ = services.filter(s => s.dataSources?.rabbitMQ).length;
+    const withDedicatedDB = services.filter(s => s.dataSources?.dedicatedDB).length;
+    const withS3 = services.filter(s => s.dataSources?.s3).length;
+
+    // Calculate criticality distribution
+    const criticalityMap = services.reduce((acc, service) => {
+        const criticality = service.criticality || 'Non définie';
+        acc[criticality] = (acc[criticality] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const highCriticalityCount = criticalityMap['Haute'] || 0;
+    const mediumCriticalityCount = criticalityMap['Moyenne'] || 0;
+    const lowCriticalityCount = criticalityMap['Basse'] || 0;
+
+    // Calculate connectivity metrics
+    const avgConsumers = services.reduce((sum, service) => sum + (service.clientConsumers?.length || 0), 0) / (totalApis || 1);
+    const avgConsumedBy = services.reduce((sum, service) => sum + (service.consumedBy?.length || 0), 0) / (totalApis || 1);
+    const avgConsumes = services.reduce((sum, service) => sum + (service.consumes?.length || 0), 0) / (totalApis || 1);
+
     // Filter services
     const filteredServices = services.filter(service => {
         const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -82,43 +118,131 @@ const APIDashboard: React.FC<APIDashboardProps> = ({ services }) => {
                             Vue d'ensemble et gestion des APIs de la plateforme
                         </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                             <motion.div 
                                 variants={itemVariants}
-                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 flex items-center"
+                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
                             >
-                                <div className="p-3 bg-white/20 rounded-lg mr-4">
-                                    <Server className="w-6 h-6" />
+                                <div className="flex items-center mb-3">
+                                    <div className="p-2 bg-blue-500/30 rounded-lg mr-3">
+                                        <Server className="w-5 h-5 text-blue-300" />
+                                    </div>
+                                    <p className="text-white/80 font-medium">Santé Technique</p>
                                 </div>
-                                <div>
-                                    <p className="text-white/70 text-sm">Total APIs</p>
-                                    <p className="text-2xl font-bold">{totalApis}</p>
+                                <div className="space-y-2">
+                                    <div>
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-white/70">Java 17</span>
+                                            <span className="text-white/90 font-medium">{java17MigratedPercentage}%</span>
+                                        </div>
+                                        <div className="w-full bg-white/10 rounded-full h-1.5">
+                                            <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${java17MigratedPercentage}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-white/70">Sonarized</span>
+                                            <span className="text-white/90 font-medium">{sonarizedPercentage}%</span>
+                                        </div>
+                                        <div className="w-full bg-white/10 rounded-full h-1.5">
+                                            <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${sonarizedPercentage}%` }}></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </motion.div>
 
                             <motion.div 
                                 variants={itemVariants}
-                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 flex items-center"
+                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
                             >
-                                <div className="p-3 bg-emerald-500/30 rounded-lg mr-4">
-                                    <GitBranch className="w-6 h-6 text-emerald-300" />
+                                <div className="flex items-center mb-3">
+                                    <div className="p-2 bg-purple-500/30 rounded-lg mr-3">
+                                        <Database className="w-5 h-5 text-purple-300" />
+                                    </div>
+                                    <p className="text-white/80 font-medium">Sources de Données</p>
                                 </div>
-                                <div>
-                                    <p className="text-white/70 text-sm">En Production</p>
-                                    <p className="text-2xl font-bold">{productionApis}</p>
+                                <div className="grid grid-cols-3 gap-2 text-center">
+                                    <div className="bg-white/10 rounded-lg p-2">
+                                        <p className="text-white/70 text-xs mb-1">RabbitMQ</p>
+                                        <p className="text-xl font-bold text-white">{withRabbitMQ}</p>
+                                        <p className="text-white/60 text-xs">{Math.round((withRabbitMQ / totalApis) * 100)}%</p>
+                                    </div>
+                                    <div className="bg-white/10 rounded-lg p-2">
+                                        <p className="text-white/70 text-xs mb-1">DB Dédiée</p>
+                                        <p className="text-xl font-bold text-white">{withDedicatedDB}</p>
+                                        <p className="text-white/60 text-xs">{Math.round((withDedicatedDB / totalApis) * 100)}%</p>
+                                    </div>
+                                    <div className="bg-white/10 rounded-lg p-2">
+                                        <p className="text-white/70 text-xs mb-1">S3</p>
+                                        <p className="text-xl font-bold text-white">{withS3}</p>
+                                        <p className="text-white/60 text-xs">{Math.round((withS3 / totalApis) * 100)}%</p>
+                                    </div>
                                 </div>
                             </motion.div>
 
                             <motion.div 
                                 variants={itemVariants}
-                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 flex items-center"
+                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
                             >
-                                <div className="p-3 bg-amber-500/30 rounded-lg mr-4">
-                                    <RefreshCw className="w-6 h-6 text-amber-300" />
+                                <div className="flex items-center mb-3">
+                                    <div className="p-2 bg-green-500/30 rounded-lg mr-3">
+                                        <GitBranch className="w-5 h-5 text-green-300" />
+                                    </div>
+                                    <p className="text-white/80 font-medium">Connectivité</p>
                                 </div>
-                                <div>
-                                    <p className="text-white/70 text-sm">En Développement</p>
-                                    <p className="text-2xl font-bold">{inProgressApis}</p>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-white/70 text-sm">Consommateurs</span>
+                                        <span className="text-white font-medium">{avgConsumers.toFixed(1)} moy.</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-white/70 text-sm">Consommé par</span>
+                                        <span className="text-white font-medium">{avgConsumedBy.toFixed(1)} moy.</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-white/70 text-sm">Bridge Comm.</span>
+                                        <span className="text-white font-medium">{bridgeCount} ({bridgePercentage}%)</span>
+                                    </div>
+                                </div>
+                            </motion.div>
+
+                            <motion.div 
+                                variants={itemVariants}
+                                className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
+                            >
+                                <div className="flex items-center mb-3">
+                                    <div className="p-2 bg-amber-500/30 rounded-lg mr-3">
+                                        <Filter className="w-5 h-5 text-amber-300" />
+                                    </div>
+                                    <p className="text-white/80 font-medium">Documentation & Criticité</p>
+                                </div>
+                                <div className="space-y-3">
+                                    <div>
+                                        <div className="flex justify-between text-sm mb-1">
+                                            <span className="text-white/70">Documenté</span>
+                                            <span className="text-white/90 font-medium">{documentedPercentage}%</span>
+                                        </div>
+                                        <div className="w-full bg-white/10 rounded-full h-1.5">
+                                            <div className="bg-amber-400 h-1.5 rounded-full" style={{ width: `${documentedPercentage}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-1">
+                                        <p className="text-white/70 text-sm mb-2">Criticité</p>
+                                        <div className="grid grid-cols-3 gap-2 text-center">
+                                            <div className="bg-white/10 rounded-lg p-1">
+                                                <p className="text-white/70 text-xs">Haute</p>
+                                                <p className="text-lg font-bold text-red-300">{highCriticalityCount}</p>
+                                            </div>
+                                            <div className="bg-white/10 rounded-lg p-1">
+                                                <p className="text-white/70 text-xs">Moyenne</p>
+                                                <p className="text-lg font-bold text-amber-300">{mediumCriticalityCount}</p>
+                                            </div>
+                                            <div className="bg-white/10 rounded-lg p-1">
+                                                <p className="text-white/70 text-xs">Basse</p>
+                                                <p className="text-lg font-bold text-green-300">{lowCriticalityCount}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </motion.div>
                         </div>
