@@ -1,0 +1,394 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { APIService } from '../../../types/api';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, RadialBarChart, RadialBar } from 'recharts';
+import { Server, GitBranch, Hash, TrendingUp, Activity, Clock, CheckCircle, AlertTriangle, BarChart2 } from 'lucide-react';
+
+interface APIStatisticsProps {
+    services: APIService[];
+}
+
+const APIStatistics: React.FC<APIStatisticsProps> = ({ services }) => {
+    // Calculer les statistiques
+    const totalApis = services.length;
+    const productionApis = services.filter(s => s.developmentStatus === 'Production').length;
+    const inProgressApis = services.filter(s => s.developmentStatus === 'inProgress').length;
+    const productionPercentage = totalApis > 0 ? Math.round((productionApis / totalApis) * 100) : 0;
+    const inProgressPercentage = totalApis > 0 ? Math.round((inProgressApis / totalApis) * 100) : 0;
+
+    // Données pour le graphique de statut
+    const statusData = [
+        { name: 'Production', value: productionApis, fill: '#10B981' },
+        { name: 'En développement', value: inProgressApis, fill: '#F59E0B' }
+    ];
+
+    // Grouper par trigramme
+    const trigrammeStats = services.reduce((acc, service) => {
+        acc[service.trigramme] = (acc[service.trigramme] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const trigrammeData = Object.entries(trigrammeStats)
+        .map(([name, value]) => ({
+            name,
+            value,
+            fill: getRandomGradientColor()
+        }))
+        .sort((a, b) => b.value - a.value); // Sort by value descending
+
+    // Données pour le graphique radial
+    const radialData = [
+        { name: 'Production', value: productionPercentage, fill: '#10B981' },
+        { name: 'En développement', value: inProgressPercentage, fill: '#F59E0B' }
+    ];
+
+    // Couleurs avec dégradés
+    function getRandomGradientColor() {
+        const colors = [
+            '#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981',
+            '#3B82F6', '#8B5CF6', '#F43F5E', '#FBBF24', '#34D399'
+        ];
+        return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Animation variants
+    const cardVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: (i: number) => ({
+            opacity: 1,
+            y: 0,
+            transition: {
+                delay: i * 0.1,
+                duration: 0.5,
+                ease: "easeOut"
+            }
+        })
+    };
+
+    // Calculer les top trigrammes
+    const topTrigrammes = [...trigrammeData]
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+
+    return (
+        <div className="space-y-8">
+            {/* Header avec statistiques clés */}
+            <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl p-6 text-white"
+            >
+                <div className="flex items-center gap-3 mb-4">
+                    <Activity className="w-6 h-6" />
+                    <h2 className="text-2xl font-bold">Tableau de bord des APIs</h2>
+                </div>
+                <p className="mb-6 opacity-90">Vue d'ensemble et analyse détaillée de l'écosystème API</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <motion.div
+                        custom={0}
+                        variants={cardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-white/70 text-sm">Total APIs</p>
+                                <h3 className="text-3xl font-bold mt-1">{totalApis}</h3>
+                            </div>
+                            <div className="p-2 bg-white/20 rounded-lg">
+                                <Server className="w-6 h-6" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4 text-emerald-300" />
+                            <span className="text-sm text-emerald-300">Écosystème complet</span>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        custom={1}
+                        variants={cardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-white/70 text-sm">En Production</p>
+                                <h3 className="text-3xl font-bold mt-1">{productionApis}</h3>
+                            </div>
+                            <div className="p-2 bg-emerald-500/30 rounded-lg">
+                                <CheckCircle className="w-6 h-6 text-emerald-300" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                            <div className="w-full bg-white/20 rounded-full h-2">
+                                <div className="bg-emerald-400 h-2 rounded-full" style={{ width: `${productionPercentage}%` }}></div>
+                            </div>
+                            <span className="text-sm font-medium">{productionPercentage}%</span>
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        custom={2}
+                        variants={cardVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <p className="text-white/70 text-sm">En Développement</p>
+                                <h3 className="text-3xl font-bold mt-1">{inProgressApis}</h3>
+                            </div>
+                            <div className="p-2 bg-amber-500/30 rounded-lg">
+                                <Clock className="w-6 h-6 text-amber-300" />
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2">
+                            <div className="w-full bg-white/20 rounded-full h-2">
+                                <div className="bg-amber-400 h-2 rounded-full" style={{ width: `${inProgressPercentage}%` }}></div>
+                            </div>
+                            <span className="text-sm font-medium">{inProgressPercentage}%</span>
+                        </div>
+                    </motion.div>
+                </div>
+            </motion.div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Statistiques détaillées */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5 }}
+                    className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6 overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100 to-transparent rounded-bl-full opacity-50"></div>
+
+                    <h2 className="text-xl font-semibold text-neutral-800 mb-6 flex items-center gap-2">
+                        <BarChart2 className="w-5 h-5 text-blue-600" />
+                        <span>Répartition des APIs</span>
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-100 transform transition-transform hover:scale-105">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-blue-100 rounded-full">
+                                        <Server className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <span className="text-blue-700 font-medium">Total APIs</span>
+                                </div>
+                                <p className="text-3xl font-bold text-blue-700">{totalApis}</p>
+                                <p className="text-sm text-blue-600 mt-1">Écosystème complet</p>
+                            </div>
+
+                            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-100 transform transition-transform hover:scale-105">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-green-100 rounded-full">
+                                        <GitBranch className="w-5 h-5 text-green-600" />
+                                    </div>
+                                    <span className="text-green-700 font-medium">Production</span>
+                                </div>
+                                <p className="text-3xl font-bold text-green-700">{productionApis}</p>
+                                <p className="text-sm text-green-600 mt-1">{productionPercentage}% du total</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-100 transform transition-transform hover:scale-105">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-amber-100 rounded-full">
+                                        <Clock className="w-5 h-5 text-amber-600" />
+                                    </div>
+                                    <span className="text-amber-700 font-medium">En Développement</span>
+                                </div>
+                                <p className="text-3xl font-bold text-amber-700">{inProgressApis}</p>
+                                <p className="text-sm text-amber-600 mt-1">{inProgressPercentage}% du total</p>
+                            </div>
+
+                            <div className="p-4 bg-gradient-to-r from-purple-50 to-fuchsia-50 rounded-lg border border-purple-100 transform transition-transform hover:scale-105">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-purple-100 rounded-full">
+                                        <Hash className="w-5 h-5 text-purple-600" />
+                                    </div>
+                                    <span className="text-purple-700 font-medium">Trigrammes</span>
+                                </div>
+                                <p className="text-3xl font-bold text-purple-700">{Object.keys(trigrammeStats).length}</p>
+                                <p className="text-sm text-purple-600 mt-1">Équipes contributrices</p>
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Graphique Status */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                    className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6 overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100 to-transparent rounded-bl-full opacity-50"></div>
+
+                    <h2 className="text-xl font-semibold text-neutral-800 mb-6 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-green-600" />
+                        <span>Status des APIs</span>
+                    </h2>
+
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RadialBarChart
+                                cx="50%"
+                                cy="50%"
+                                innerRadius="20%"
+                                outerRadius="90%"
+                                data={radialData}
+                                startAngle={180}
+                                endAngle={0}
+                            >
+                                <RadialBar
+                                    minAngle={15}
+                                    background
+                                    clockWise={true}
+                                    dataKey="value"
+                                    cornerRadius={10}
+                                    label={{ fill: '#666', position: 'insideStart', formatter: (value: number) => `${value}%` }}
+                                />
+                                <Legend
+                                    iconSize={10}
+                                    layout="vertical"
+                                    verticalAlign="middle"
+                                    align="right"
+                                    wrapperStyle={{ fontSize: '12px', fontWeight: 500 }}
+                                />
+                                <Tooltip
+                                    formatter={(value: number) => [`${value}%`, 'Pourcentage']}
+                                    contentStyle={{ borderRadius: '8px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                />
+                            </RadialBarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                            <span className="text-sm font-medium text-green-700">Production: {productionApis} APIs</span>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 bg-amber-50 rounded-lg">
+                            <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                            <span className="text-sm font-medium text-amber-700">En développement: {inProgressApis} APIs</span>
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Top Trigrammes */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.2 }}
+                    className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6 overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-100 to-transparent rounded-bl-full opacity-50"></div>
+
+                    <h2 className="text-xl font-semibold text-neutral-800 mb-6 flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-purple-600" />
+                        <span>Top Trigrammes</span>
+                    </h2>
+
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={topTrigrammes}
+                                layout="vertical"
+                                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                <XAxis type="number" />
+                                <YAxis dataKey="name" type="category" width={80} />
+                                <Tooltip
+                                    contentStyle={{
+                                        borderRadius: '8px',
+                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                        border: 'none'
+                                    }}
+                                    formatter={(value: number) => [`${value} APIs`, 'Nombre']}
+                                />
+                                <Bar
+                                    dataKey="value"
+                                    radius={[0, 4, 4, 0]}
+                                    barSize={30}
+                                >
+                                    {topTrigrammes.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </motion.div>
+
+                {/* Graphique Trigrammes */}
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    className="bg-white rounded-xl shadow-lg border border-neutral-200 p-6 overflow-hidden relative"
+                >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100 to-transparent rounded-bl-full opacity-50"></div>
+
+                    <h2 className="text-xl font-semibold text-neutral-800 mb-6 flex items-center gap-2">
+                        <Hash className="w-5 h-5 text-blue-600" />
+                        <span>Distribution par Trigramme</span>
+                    </h2>
+
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={trigrammeData}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={70}
+                                    outerRadius={90}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                    label={({ name, value, percent }) =>
+                                        `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                                    }
+                                    labelLine={{ stroke: '#555', strokeWidth: 1, strokeDasharray: '3 3' }}
+                                >
+                                    {trigrammeData.map((entry, index) => (
+                                        <Cell
+                                            key={`cell-${index}`}
+                                            fill={entry.fill}
+                                            stroke="#fff"
+                                            strokeWidth={2}
+                                        />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    formatter={(value: number, name: string) => [`${value} APIs`, name]}
+                                    contentStyle={{
+                                        borderRadius: '8px',
+                                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                                        border: 'none'
+                                    }}
+                                />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="mt-4 text-center">
+                        <p className="text-sm text-neutral-500">
+                            {Object.keys(trigrammeStats).length} trigrammes différents contribuent à l'écosystème API
+                        </p>
+                    </div>
+                </motion.div>
+            </div>
+        </div>
+    );
+};
+
+export default APIStatistics;
