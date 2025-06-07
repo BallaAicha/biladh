@@ -6,9 +6,10 @@ interface WelcomeSectionProps {
   user?: {
     givenname?: string;
   };
+  onViewAPIs?: () => void;
 }
 
-const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
+const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user, onViewAPIs }) => {
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -53,7 +54,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
   };
 
   return (
-    <header className="bg-gradient-to-r from-indigo-700 via-purple-700 to-primary-800 pt-28 pb-36 px-6 relative overflow-hidden">
+    <header className="bg-gradient-to-r from-indigo-700 via-purple-700 to-primary-800 pt-8 pb-36 px-6 relative overflow-hidden">
       {/* Enhanced decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
         <motion.div 
@@ -80,7 +81,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
           }}
           className="absolute right-1/3 top-1/4 w-64 h-64 bg-purple-500 opacity-10 rounded-full blur-3xl"
         />
-        
+
         {/* Animated particles */}
         <div className="absolute inset-0">
           {[...Array(6)].map((_, i) => (
@@ -119,11 +120,11 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
               </div>
               <span className="text-amber-300 font-medium text-sm">Plateforme d'Innovation</span>
             </div>
-            
+
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-2">
               {getGreeting()}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{user?.givenname || 'sur votre Portail'}</span>
             </h1>
-            
+
             <p className="mt-4 text-lg md:text-xl text-white/80 max-w-2xl font-light leading-relaxed">
               Let's deliver better projects together! Une plateforme pensée pour les équipes de SGABS : 
               <span className="font-medium text-white"> APIS</span>, 
@@ -131,7 +132,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
               <span className="font-medium text-white"> Génération de projets</span>, 
               tout en un seul endroit.
             </p>
-            
+
             <div className="mt-8 flex flex-wrap gap-4">
               <motion.button 
                 whileHover={{ scale: 1.03, boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.5)" }}
@@ -142,17 +143,18 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
                 Explorer les documents
                 <ChevronRight size={16} className="ml-1" />
               </motion.button>
-              
+
               <motion.button 
                 whileHover={{ scale: 1.03, backgroundColor: "rgba(255, 255, 255, 0.15)" }}
                 whileTap={{ scale: 0.98 }}
+                onClick={onViewAPIs}
                 className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl font-medium flex items-center gap-2 border border-white/20 transition-all duration-300"
               >
                 <Code size={18} />
                 Voir les APIs
               </motion.button>
             </div>
-            
+
             <div className="mt-8 flex items-center gap-6">
               <div className="flex -space-x-2">
                 {[...Array(4)].map((_, i) => (
@@ -169,7 +171,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
               </div>
             </div>
           </motion.div>
-          
+
           <motion.div variants={itemVariants} className="w-full md:w-auto">
             {/* Search component placeholder */}
             <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/20 shadow-xl">
@@ -177,7 +179,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
                 <Search className="w-4 h-4" />
                 Recherche rapide
               </h3>
-              
+
               <div className="relative">
                 <input
                   type="text"
@@ -188,7 +190,7 @@ const WelcomeSection: React.FC<WelcomeSectionProps> = ({ user }) => {
                   <Search className="w-4 h-4 text-white" />
                 </button>
               </div>
-              
+
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <button className="flex items-center gap-2 bg-white/5 hover:bg-white/10 rounded-lg p-2 text-white/70 text-sm transition-colors">
                   <Database className="w-4 h-4" />
