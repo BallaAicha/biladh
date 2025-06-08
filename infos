@@ -1604,3 +1604,60 @@ public class TemplateProcessingException extends RuntimeException {
     "includeSwagger": true,
     "includeTestContainers": false
 }
+
+
+
+
+
+----------
+package com.socgen.unibank.services.autotest.model.exception;
+
+/**
+ * Exception lancée lorsqu'une erreur survient pendant la génération d'un projet.
+ */
+public class ProjectGenerationException extends RuntimeException {
+
+    /**
+     * Crée une nouvelle instance de ProjectGenerationException avec le message spécifié.
+     *
+     * @param message le message d'erreur
+     */
+    public ProjectGenerationException(String message) {
+        super(message);
+    }
+
+    /**
+     * Crée une nouvelle instance de ProjectGenerationException avec le message et la cause spécifiés.
+     *
+     * @param message le message d'erreur
+     * @param cause la cause de l'exception
+     */
+    public ProjectGenerationException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+
+/**
+ * Exception lancée lorsqu'une erreur survient pendant le traitement d'un template.
+ */
+public class TemplateProcessingException extends RuntimeException {
+
+    /**
+     * Crée une nouvelle instance de TemplateProcessingException avec le message spécifié.
+     *
+     * @param message le message d'erreur
+     */
+    public TemplateProcessingException(String message) {
+        super(message);
+    }
+
+    /**
+     * Crée une nouvelle instance de TemplateProcessingException avec le message et la cause spécifiés.
+     *
+     * @param message le message d'erreur
+     * @param cause la cause de l'exception
+     */
+    public TemplateProcessingException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
