@@ -1,0 +1,148 @@
+package com.socgen.unibank.services.autotest.model.generator;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.template.ApiModuleTemplates;
+import com.socgen.unibank.services.autotest.model.util.StringUtils;
+import com.socgen.unibank.services.utils.PathUtils;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.Set;
+import java.util.zip.ZipOutputStream;
+
+/**
+ * Générateur de module API amélioré.
+ * Cette classe est responsable de la génération des fichiers du module API d'un projet.
+ * Elle utilise la classe PathUtils pour construire des chemins de fichiers cohérents.
+ */
+@Component
+@RequiredArgsConstructor
+public class ApiModuleGenerator implements ProjectModuleGenerator {
+    private static final Logger log = LoggerFactory.getLogger(ApiModuleGenerator.class);
+    private final ApiModuleTemplates templates;
+    private static final String MODULE_NAME = "api";
+    private static final String DEFAULT_BASE_PACKAGE = "com.socgen.unibank.services";
+
+    @Override
+    public void generate(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException {
+        String projectName = request.getProjectName();
+        String pascalCaseName = StringUtils.toPascalCase(projectName);
+        String basePackage = request.getBasePackage() != null ? request.getBasePackage() : DEFAULT_BASE_PACKAGE;
+
+        log.debug("Generating API module for project: {}", projectName);
+
+        // Création des répertoires pour les fichiers Java
+        ensureDirectoriesExist(zos, projectName, basePackage, addedFiles);
+
+        // Génération du fichier build.gradle.kts
+        String buildGradlePath = PathUtils.buildModulePath(projectName, MODULE_NAME, "build.gradle.kts");
+        addToZip(zos, buildGradlePath, templates.getApiBuildGradleTemplate(), addedFiles);
+
+        // Génération des classes de modèle
+        generateApiModelClasses(zos, projectName, basePackage, addedFiles);
+
+        // Génération des interfaces de cas d'utilisation
+        generateApiUseCaseInterfaces(zos, projectName, basePackage, addedFiles);
+
+        // Génération de l'interface API principale
+        String apiSubPackage = "api";
+        String apiClassName = pascalCaseName + "API.java";
+        String projectAPIPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, apiSubPackage, apiClassName);
+        addToZip(zos, projectAPIPath, templates.getProjectApiTemplate(pascalCaseName), addedFiles);
+
+        log.info("API module generated successfully for project: {}", projectName);
+    }
+
+    /**
+     * Génère les classes de modèle de l'API.
+     */
+    private void generateApiModelClasses(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        String modelSubPackage = "api.model";
+
+        // Génération de la classe de requête
+        String requestTemplate = templates.getHelloWorldRequestTemplate();
+        String requestClassName = extractClassName(requestTemplate) + ".java";
+        String requestPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, modelSubPackage, requestClassName);
+        addToZip(zos, requestPath, requestTemplate, addedFiles);
+
+        // Génération de la classe de réponse
+        String responseTemplate = templates.getHelloWorldResponseTemplate();
+        String responseClassName = extractClassName(responseTemplate) + ".java";
+        String responsePath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, modelSubPackage, responseClassName);
+        addToZip(zos, responsePath, responseTemplate, addedFiles);
+    }
+
+    /**
+     * Extrait le nom de la classe à partir du contenu du template.
+     *
+     * @param templateContent Le contenu du template
+     * @return Le nom de la classe extrait
+     */
+    private String extractClassName(String templateContent) {
+        // Recherche d'une ligne contenant "public class" suivi du nom de la classe
+        for (String line : templateContent.split("\n")) {
+            line = line.trim();
+            if (line.startsWith("public class ")) {
+                // Extrait le nom de la classe (entre "public class " et le premier caractère '{' ou espace après le nom)
+                String className = line.substring("public class ".length());
+                int endIndex = className.indexOf('{');
+                if (endIndex == -1) {
+                    endIndex = className.indexOf(' ');
+                }
+                if (endIndex != -1) {
+                    className = className.substring(0, endIndex);
+                }
+                return className.trim();
+            }
+        }
+        // Si aucun nom de classe n'est trouvé, retourne une valeur par défaut
+        return "UnknownClass";
+    }
+
+    /**
+     * Génère les interfaces de cas d'utilisation de l'API.
+     */
+    private void generateApiUseCaseInterfaces(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        String usecaseSubPackage = "api.usecases";
+        String usecaseTemplate = templates.getCreateSgabsHelloWorldTemplate();
+        String usecaseClassName = extractClassName(usecaseTemplate) + ".java";
+        String usecasePath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, usecaseSubPackage, usecaseClassName);
+        addToZip(zos, usecasePath, usecaseTemplate, addedFiles);
+    }
+
+    /**
+     * Assure que les répertoires nécessaires existent dans l'archive ZIP.
+     */
+    private void ensureDirectoriesExist(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        // Répertoire de base du module
+        String moduleDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "");
+        createDirectories(zos, moduleDir, addedFiles);
+
+        // Répertoire src/main/java
+        String srcMainJavaDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "src/main/java/");
+        createDirectories(zos, srcMainJavaDir, addedFiles);
+
+        // Répertoire de package de base
+        String basePackageDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "", "");
+        createDirectories(zos, basePackageDir, addedFiles);
+
+        // Répertoire api
+        String apiDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "api", "");
+        createDirectories(zos, apiDir, addedFiles);
+
+        // Répertoire api/model
+        String modelDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "api.model", "");
+        createDirectories(zos, modelDir, addedFiles);
+
+        // Répertoire api/usecases
+        String usecasesDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "api.usecases", "");
+        createDirectories(zos, usecasesDir, addedFiles);
+    }
+}
