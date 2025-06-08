@@ -1,0 +1,1606 @@
+package com.socgen.unibank.services.autotest.model.model;
+
+import lombok.Builder;
+import lombok.Data;
+
+/**
+ * DTO représentant la requête de création d'un projet.
+ *
+ * Cette classe contient toutes les informations nécessaires pour configurer
+ * et générer un nouveau projet avec ses paramètres spécifiques.
+ */
+@Data
+@Builder
+public class ProjectRequest {
+    private String projectName;
+    private String javaVersion;
+    private String gradleVersion;
+    private String groupId;
+    private String artifactId;
+    private String description;
+
+    @Builder.Default
+    private String version = "1.0.0";
+
+    @Builder.Default
+    private String unibankDomainVersion = "3.7.79";
+
+    @Builder.Default
+    private String unibankPlatformVersion = "3.2-95";
+
+    // Nouveaux paramètres pour plus de flexibilité
+    @Builder.Default
+    private String lombokVersion = "1.18.26";
+
+    @Builder.Default
+    private String junitVersion = "5.9.2";
+
+    @Builder.Default
+    private boolean includeSwagger = true;
+
+    @Builder.Default
+    private boolean includeTestContainers = false;
+
+    @Builder.Default
+    private String basePackage = "com.socgen.unibank.services";
+}
+
+
+--------------
+Interface: GenerateProject
+package com.socgen.unibank.services.autotest.model.usecases;
+
+import com.socgen.unibank.platform.domain.Command;
+import com.socgen.unibank.platform.models.RequestContext;
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ResponseEntity;
+
+public interface GenerateProject extends Command {
+    ResponseEntity<Resource> handle(ProjectRequest request, RequestContext context);
+}
+
+
+---------------
+Implementation: GenerateProjectImpl
+package com.socgen.unibank.services.autotest.model.usecases;
+
+import com.socgen.unibank.platform.domain.Command;
+import com.socgen.unibank.platform.models.RequestContext;
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.exception.ProjectGenerationException;
+import com.socgen.unibank.services.autotest.model.generator.ProjectModuleGenerator;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.ZipOutputStream;
+
+/**
+ * Implémentation du cas d'utilisation de génération de projet.
+ * Cette classe orchestre la génération des différents modules du projet.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class GenerateProjectImpl implements GenerateProject {
+    private final List<ProjectModuleGenerator> moduleGenerators;
+    private static final String ZIP_EXTENSION = "-project.zip";
+
+    @Override
+    public ResponseEntity<Resource> handle(ProjectRequest request, RequestContext context) {
+        validateRequest(request);
+
+        log.info("Début de la génération du projet {}", request.getProjectName());
+        long startTime = System.currentTimeMillis();
+
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             ZipOutputStream zos = new ZipOutputStream(baos)) {
+
+            Set<String> addedFiles = new LinkedHashSet<>();
+            AtomicInteger moduleCount = new AtomicInteger(0);
+
+            moduleGenerators.forEach(generator -> {
+                String moduleName = generator.getClass().getSimpleName();
+                log.debug("Génération du module {} pour le projet {}", moduleName, request.getProjectName());
+
+                try {
+                    generator.generate(zos, request, addedFiles);
+                    moduleCount.incrementAndGet();
+                    log.debug("Module {} généré avec succès", moduleName);
+                } catch (IOException e) {
+                    log.error("Échec de génération du module {}: {}", moduleName, e.getMessage(), e);
+                    throw new ProjectGenerationException("Échec de génération du module " + moduleName, e);
+                }
+            });
+
+            zos.finish();
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("Projet {} généré avec succès en {}ms avec {} fichiers et {} modules",
+                    request.getProjectName(), duration, addedFiles.size(), moduleCount.get());
+
+            return createZipResponse(request, baos);
+
+        } catch (IOException e) {
+            log.error("Erreur I/O lors de la génération du projet {}: {}", request.getProjectName(), e.getMessage(), e);
+            throw new ProjectGenerationException("Échec de génération du projet: erreur I/O", e);
+        } catch (ProjectGenerationException e) {
+            // Déjà loggé, on le propage simplement
+            throw e;
+        } catch (Exception e) {
+            log.error("Erreur inattendue lors de la génération du projet {}: {}", request.getProjectName(), e.getMessage(), e);
+            throw new ProjectGenerationException("Échec inattendu de génération du projet", e);
+        }
+    }
+
+    /**
+     * Valide la requête de génération de projet.
+     *
+     * @param request La requête à valider
+     * @throws IllegalArgumentException si la requête est invalide
+     */
+    private void validateRequest(ProjectRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("La requête de projet ne peut pas être null");
+        }
+
+        if (request.getProjectName() == null || request.getProjectName().trim().isEmpty()) {
+            throw new IllegalArgumentException("Le nom du projet est obligatoire");
+        }
+
+        if (request.getGroupId() == null || request.getGroupId().trim().isEmpty()) {
+            throw new IllegalArgumentException("Le groupId est obligatoire");
+        }
+
+        if (request.getArtifactId() == null || request.getArtifactId().trim().isEmpty()) {
+            throw new IllegalArgumentException("L'artifactId est obligatoire");
+        }
+
+        log.debug("Requête de projet validée avec succès: {}", request.getProjectName());
+    }
+
+    /**
+     * Crée une réponse HTTP contenant l'archive ZIP du projet généré.
+     *
+     * @param request La requête de génération de projet
+     * @param baos Le flux contenant les données de l'archive ZIP
+     * @return Une réponse HTTP avec l'archive ZIP en pièce jointe
+     */
+    private ResponseEntity<Resource> createZipResponse(ProjectRequest request, ByteArrayOutputStream baos) {
+        ByteArrayResource resource = new ByteArrayResource(baos.toByteArray());
+        String filename = request.getProjectName().toLowerCase() + ZIP_EXTENSION;
+
+        log.debug("Création de la réponse HTTP avec l'archive ZIP: {}, taille: {} octets",
+                filename, resource.contentLength());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentLength(resource.contentLength())
+                .body(resource);
+    }
+}
+
+----------------
+Interface: ProjectModuleGenerator
+package com.socgen.unibank.services.autotest.model.generator;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.exception.ProjectGenerationException;
+import com.socgen.unibank.services.utils.PathUtils;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+/**
+ * Interface définissant un générateur de module pour un projet.
+ * Chaque implémentation est responsable de la génération d'un ensemble spécifique
+ * de fichiers pour un module du projet.
+ */
+public interface ProjectModuleGenerator {
+    /**
+     * Génère les fichiers nécessaires pour un module spécifique
+     * et ajoute ces fichiers au flux ZIP fourni.
+     *
+     * @param zos        flux de sortie ZIP où les fichiers générés seront ajoutés
+     * @param request    objet contenant les détails nécessaires à la génération du projet
+     * @param addedFiles ensemble de chemins des fichiers déjà ajoutés pour éviter les doublons
+     * @throws IOException si une erreur survient pendant l'écriture dans le flux ZIP
+     */
+    void generate(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException;
+
+    /**
+     * Retourne le nom du module généré.
+     * Cette méthode est utile pour le logging et le débogage.
+     *
+     * @return le nom du module
+     */
+    default String getModuleName() {
+        return this.getClass().getSimpleName().replace("Generator", "");
+    }
+
+    /**
+     * Vérifie si ce générateur est applicable pour la requête donnée.
+     * Permet de filtrer conditionnellement les générateurs en fonction des paramètres de la requête.
+     *
+     * @param request la requête de génération de projet
+     * @return true si ce générateur doit être appliqué, false sinon
+     */
+    default boolean isApplicable(ProjectRequest request) {
+        return true;
+    }
+
+    /**
+     * Méthode utilitaire permettant d'ajouter un fichier dans l'archive ZIP.
+     *
+     * @param zos        flux ZIP dans lequel le contenu doit être ajouté
+     * @param path       chemin relatif du fichier dans l'archive ZIP
+     * @param content    contenu textuel à ajouter au fichier ZIP
+     * @param addedFiles ensemble des chemins déjà présents dans le ZIP (sert à éviter les duplications)
+     * @throws IOException en cas d'erreur I/O lors de l'écriture
+     * @throws ProjectGenerationException si une entrée dupliquée est détectée
+     */
+    default void addToZip(ZipOutputStream zos, String path, String content, Set<String> addedFiles) throws IOException {
+        if (addedFiles.contains(path)) {
+            throw new ProjectGenerationException(
+                String.format("Entrée dupliquée détectée dans le ZIP: %s", path)
+            );
+        }
+
+        try {
+            // Normalisation du chemin pour éviter les problèmes sur différents OS
+            String normalizedPath = PathUtils.normalizePath(path);
+
+            // Création des répertoires parents si nécessaire
+            String parentDir = PathUtils.getParentDirectory(normalizedPath);
+            if (!parentDir.isEmpty() && !addedFiles.contains(parentDir)) {
+                ZipEntry dirEntry = new ZipEntry(parentDir);
+                zos.putNextEntry(dirEntry);
+                zos.closeEntry();
+                addedFiles.add(parentDir);
+            }
+
+            // Création d'une nouvelle entrée dans l'archive ZIP avec le chemin spécifié
+            ZipEntry entry = new ZipEntry(normalizedPath);
+            entry.setMethod(ZipEntry.DEFLATED); // Définit la méthode de compression utilisée
+            zos.putNextEntry(entry); // Initialise le flux pour accepter les données d'entrée
+
+            // Écriture du contenu textuel dans le flux ZIP avec encodage UTF-8
+            byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+            zos.write(contentBytes, 0, contentBytes.length);
+            zos.closeEntry();
+            addedFiles.add(normalizedPath);
+        } catch (IOException e) {
+            throw new IOException("Erreur lors de l'ajout du fichier " + path + " au ZIP", e);
+        }
+    }
+
+    /**
+     * Méthode utilitaire permettant d'ajouter un fichier binaire dans l'archive ZIP.
+     *
+     * @param zos        flux ZIP dans lequel le contenu doit être ajouté
+     * @param path       chemin relatif du fichier dans l'archive ZIP
+     * @param content    contenu binaire à ajouter au fichier ZIP
+     * @param addedFiles ensemble des chemins déjà présents dans le ZIP (sert à éviter les duplications)
+     * @throws IOException en cas d'erreur I/O lors de l'écriture
+     * @throws ProjectGenerationException si une entrée dupliquée est détectée
+     */
+    default void addBinaryToZip(ZipOutputStream zos, String path, byte[] content, Set<String> addedFiles) throws IOException {
+        if (addedFiles.contains(path)) {
+            throw new ProjectGenerationException(
+                String.format("Entrée dupliquée détectée dans le ZIP: %s", path)
+            );
+        }
+
+        try {
+            // Normalisation du chemin pour éviter les problèmes sur différents OS
+            String normalizedPath = PathUtils.normalizePath(path);
+
+            // Création des répertoires parents si nécessaire
+            String parentDir = PathUtils.getParentDirectory(normalizedPath);
+            if (!parentDir.isEmpty() && !addedFiles.contains(parentDir)) {
+                ZipEntry dirEntry = new ZipEntry(parentDir);
+                zos.putNextEntry(dirEntry);
+                zos.closeEntry();
+                addedFiles.add(parentDir);
+            }
+
+            // Création d'une nouvelle entrée dans l'archive ZIP avec le chemin spécifié
+            ZipEntry entry = new ZipEntry(normalizedPath);
+            entry.setMethod(ZipEntry.DEFLATED); // Définit la méthode de compression utilisée
+            zos.putNextEntry(entry); // Initialise le flux pour accepter les données d'entrée
+
+            // Écriture du contenu binaire dans le flux ZIP
+            zos.write(content, 0, content.length);
+            zos.closeEntry();
+            addedFiles.add(normalizedPath);
+        } catch (IOException e) {
+            throw new IOException("Erreur lors de l'ajout du fichier binaire " + path + " au ZIP", e);
+        }
+    }
+
+    /**
+     * Crée les répertoires parents nécessaires dans le ZIP pour un chemin donné.
+     * Cette méthode est utile pour s'assurer que la structure de répertoires existe
+     * avant d'ajouter un fichier.
+     *
+     * @param zos        flux ZIP dans lequel les répertoires doivent être ajoutés
+     * @param path       chemin complet du fichier pour lequel créer les répertoires parents
+     * @param addedFiles ensemble des chemins déjà présents dans le ZIP
+     * @throws IOException en cas d'erreur I/O lors de l'écriture
+     */
+    default void createDirectories(ZipOutputStream zos, String path, Set<String> addedFiles) throws IOException {
+        String normalizedPath = PathUtils.normalizePath(path);
+        String directory = PathUtils.getParentDirectory(normalizedPath);
+
+        if (!directory.isEmpty() && !addedFiles.contains(directory)) {
+            ZipEntry entry = new ZipEntry(directory);
+            zos.putNextEntry(entry);
+            zos.closeEntry();
+            addedFiles.add(directory);
+        }
+    }
+}
+
+
+-----------------
+Class: RootProjectGenerator
+package com.socgen.unibank.services.autotest.model.generator;
+
+import com.socgen.unibank.services.autotest.model.exception.ProjectGenerationException;
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.template.RootProjectTemplates;
+import com.socgen.unibank.services.utils.PathUtils;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Set;
+import java.util.zip.ZipOutputStream;
+
+@Component
+@Slf4j
+@RequiredArgsConstructor
+public class RootProjectGenerator implements ProjectModuleGenerator {
+    private final RootProjectTemplates templates;
+    private static final List<String> ROOT_FILES = List.of(
+            "settings.gradle.kts",
+            "gradle.properties",
+            "build.gradle.kts",
+            "README.md",
+            ".gitignore"
+    );
+
+    @Override
+    public void generate(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException {
+        try {
+            log.debug("Generating root project files for: {}", request.getProjectName());
+            generateRootFiles(zos, request, addedFiles);
+            log.info("Root project files generated successfully");
+        } catch (Exception e) {
+            log.error("Error generating root project files", e);
+            throw new ProjectGenerationException("Échec de génération des fichiers racine", e);
+        }
+    }
+
+    private void generateRootFiles(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException {
+        addToZip(zos, PathUtils.buildRootPath("settings.gradle.kts"),
+                templates.getSettingsGradleKtsTemplate(request.getProjectName()), addedFiles);
+        addToZip(zos, PathUtils.buildRootPath("gradle.properties"),
+                templates.getGradlePropertiesTemplate(request), addedFiles);
+        addToZip(zos, PathUtils.buildRootPath("build.gradle.kts"),
+                templates.getBuildGradleKtsTemplate(request), addedFiles);
+        addToZip(zos, PathUtils.buildRootPath("README.md"),
+                templates.getReadmeTemplate(request), addedFiles);
+        addToZip(zos, PathUtils.buildRootPath(".gitignore"),
+                templates.getGitignoreTemplate(), addedFiles);
+    }
+}
+
+----------------
+Class: TemplateService
+package com.socgen.unibank.services.autotest.model.template;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.exception.TemplateProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.templatemode.TemplateMode;
+import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
+import org.thymeleaf.templateresolver.FileTemplateResolver;
+import org.thymeleaf.templateresolver.ITemplateResolver;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Service responsable du traitement des templates pour la génération de fichiers.
+ * Utilise Thymeleaf comme moteur de template et supporte différentes sources de templates.
+ */
+@Service
+public class TemplateService {
+    private static final Logger log = LoggerFactory.getLogger(TemplateService.class);
+
+    /**
+     * Le moteur de template Thymeleaf utilisé pour le traitement des templates.
+     */
+    private final TemplateEngine templateEngine;
+
+    /**
+     * Cache des templates déjà traités pour améliorer les performances.
+     */
+    private final Map<String, String> templateCache;
+
+    /**
+     * Indique si le cache des templates est activé.
+     */
+    private final boolean cacheEnabled;
+
+    /**
+     * Constructeur par défaut qui initialise le moteur de template Thymeleaf avec les
+     * configurations appropriées pour le traitement de fichiers texte depuis le classpath.
+     */
+    public TemplateService() {
+        this(true);
+    }
+
+    /**
+     * Constructeur qui initialise le moteur de template Thymeleaf avec les
+     * configurations appropriées pour le traitement de fichiers texte depuis le classpath.
+     *
+     * @param enableCache active ou désactive le cache des templates
+     */
+    public TemplateService(boolean enableCache) {
+        this.cacheEnabled = enableCache;
+        this.templateCache = enableCache ? new ConcurrentHashMap<>() : null;
+
+        // Configuration du resolver pour les templates du classpath
+        ClassLoaderTemplateResolver classpathResolver = new ClassLoaderTemplateResolver();
+        classpathResolver.setPrefix("templates/");
+        classpathResolver.setSuffix(".txt");
+        classpathResolver.setTemplateMode(TemplateMode.TEXT);
+        classpathResolver.setCharacterEncoding("UTF-8");
+        classpathResolver.setCacheable(enableCache);
+        classpathResolver.setOrder(1);
+        classpathResolver.setCheckExistence(true);
+
+        // Configuration du resolver pour les templates de fichiers externes
+        FileTemplateResolver fileResolver = new FileTemplateResolver();
+        fileResolver.setPrefix("");
+        fileResolver.setSuffix("");
+        fileResolver.setTemplateMode(TemplateMode.TEXT);
+        fileResolver.setCharacterEncoding("UTF-8");
+        fileResolver.setCacheable(enableCache);
+        fileResolver.setOrder(2);
+        fileResolver.setCheckExistence(true);
+
+        // Initialisation du moteur de template
+        this.templateEngine = new TemplateEngine();
+        this.templateEngine.addTemplateResolver(classpathResolver);
+        this.templateEngine.addTemplateResolver(fileResolver);
+
+        log.info("Service de templates initialisé avec cache {}", enableCache ? "activé" : "désactivé");
+    }
+
+    /**
+     * Constructeur qui permet de spécifier des resolvers personnalisés.
+     *
+     * @param enableCache active ou désactive le cache des templates
+     * @param resolvers les resolvers de templates à utiliser
+     */
+    public TemplateService(boolean enableCache, ITemplateResolver... resolvers) {
+        this.cacheEnabled = enableCache;
+        this.templateCache = enableCache ? new ConcurrentHashMap<>() : null;
+
+        this.templateEngine = new TemplateEngine();
+        for (ITemplateResolver resolver : resolvers) {
+            this.templateEngine.addTemplateResolver(resolver);
+        }
+
+        log.info("Service de templates initialisé avec {} resolvers personnalisés et cache {}",
+                resolvers.length, enableCache ? "activé" : "désactivé");
+    }
+
+    /**
+     * Traite un template en utilisant les variables fournies.
+     *
+     * @param templateName Le nom du template à traiter
+     * @param variables Les variables à utiliser pour le traitement du template
+     * @return Le contenu du template après remplacement des variables
+     * @throws TemplateProcessingException si une erreur survient pendant le traitement du template
+     */
+    public String processTemplate(String templateName, Map<String, Object> variables) {
+        try {
+            // Vérification du cache si activé
+            if (cacheEnabled) {
+                String cacheKey = templateName + variables.toString();
+                if (templateCache.containsKey(cacheKey)) {
+                    log.debug("Utilisation du template en cache: {}", templateName);
+                    return templateCache.get(cacheKey);
+                }
+            }
+
+            log.debug("Traitement du template: {}", templateName);
+            Context context = new Context();
+            variables.forEach(context::setVariable);
+
+            String result = templateEngine.process(templateName, context);
+
+            // Mise en cache si activé
+            if (cacheEnabled) {
+                String cacheKey = templateName + variables.toString();
+                templateCache.put(cacheKey, result);
+            }
+
+            return result;
+        } catch (Exception e) {
+            log.error("Erreur lors du traitement du template {}: {}", templateName, e.getMessage(), e);
+            throw new TemplateProcessingException("Erreur lors du traitement du template " + templateName, e);
+        }
+    }
+
+    /**
+     * Traite un template en utilisant les valeurs du ProjectRequest.
+     *
+     * @param templateName Le nom du template à traiter
+     * @param projectRequest L'objet contenant les paramètres du projet
+     * @return Le contenu du template après remplacement des variables
+     * @throws TemplateProcessingException si une erreur survient pendant le traitement du template
+     */
+    public String processProjectTemplate(String templateName, ProjectRequest projectRequest) {
+        Map<String, Object> variables = new HashMap<>();
+
+        // Paramètres de base
+        variables.put("projectName", projectRequest.getProjectName());
+        variables.put("javaVersion", projectRequest.getJavaVersion());
+        variables.put("gradleVersion", projectRequest.getGradleVersion());
+        variables.put("groupId", projectRequest.getGroupId());
+        variables.put("artifactId", projectRequest.getArtifactId());
+        variables.put("description", projectRequest.getDescription());
+        variables.put("version", projectRequest.getVersion());
+
+        // Versions des dépendances
+        variables.put("unibankDomainVersion", projectRequest.getUnibankDomainVersion());
+        variables.put("unibankPlatformVersion", projectRequest.getUnibankPlatformVersion());
+        variables.put("lombokVersion", projectRequest.getLombokVersion());
+        variables.put("junitVersion", projectRequest.getJunitVersion());
+
+        // Options de configuration
+        variables.put("includeSwagger", projectRequest.isIncludeSwagger());
+        variables.put("includeTestContainers", projectRequest.isIncludeTestContainers());
+        variables.put("basePackage", projectRequest.getBasePackage());
+
+        return processTemplate(templateName, variables);
+    }
+
+    /**
+     * Traite un template de fichier externe.
+     *
+     * @param templateFile Le fichier template à traiter
+     * @param variables Les variables à utiliser pour le traitement du template
+     * @return Le contenu du template après remplacement des variables
+     * @throws TemplateProcessingException si une erreur survient pendant le traitement du template
+     */
+    public String processFileTemplate(File templateFile, Map<String, Object> variables) {
+        if (!templateFile.exists() || !templateFile.isFile()) {
+            throw new TemplateProcessingException("Le fichier template n'existe pas: " + templateFile.getAbsolutePath());
+        }
+
+        try {
+            log.debug("Traitement du template fichier: {}", templateFile.getAbsolutePath());
+            return processTemplate(templateFile.getAbsolutePath(), variables);
+        } catch (Exception e) {
+            log.error("Erreur lors du traitement du template fichier {}: {}",
+                    templateFile.getAbsolutePath(), e.getMessage(), e);
+            throw new TemplateProcessingException(
+                    "Erreur lors du traitement du template fichier " + templateFile.getAbsolutePath(), e);
+        }
+    }
+
+    /**
+     * Vide le cache des templates.
+     */
+    public void clearCache() {
+        if (cacheEnabled && templateCache != null) {
+            log.debug("Vidage du cache des templates ({} entrées)", templateCache.size());
+            templateCache.clear();
+        }
+    }
+}
+---------
+
+<hr></hr>
+Class: RootProjectTemplates
+package com.socgen.unibank.services.autotest.model.template;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@Component
+public class RootProjectTemplates {
+    private final TemplateService templateService;
+
+    @Value("${unibank.domain.version:3.7.79}")
+    private String unibankDomainVersion;
+
+    @Value("${unibank.platform.version:3.2.85}")
+    private String unibankPlatformVersion;
+
+    @Value("${unibank.gradle.plugin.version:1.3.10}")
+    private String unibankGradlePluginVersion;
+
+    @Value("${foundation.gradle.plugin.version:2.0.5}")
+    private String foundationGradlePluginVersion;
+
+    @Value("${default.project.version:1.0.0}")
+    private String defaultProjectVersion;
+
+    public RootProjectTemplates(TemplateService templateService) {
+        this.templateService = templateService;
+    }
+
+    public String getSettingsGradleKtsTemplate(String projectName) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("projectName", projectName);
+        return templateService.processTemplate("settings-gradle", variables);
+    }
+
+    public String getGradlePropertiesTemplate(ProjectRequest request) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("groupId", request.getGroupId());
+        variables.put("version", request.getVersion());
+        variables.put("unibankDomainVersion", request.getUnibankDomainVersion());
+        variables.put("unibankPlatformVersion", request.getUnibankPlatformVersion());
+        return templateService.processTemplate("gradle-properties", variables);
+    }
+
+    public String getBuildGradleKtsTemplate(ProjectRequest request) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("javaVersion", request.getJavaVersion());
+        variables.put("unibankGradlePluginVersion", unibankGradlePluginVersion);
+        variables.put("foundationGradlePluginVersion", foundationGradlePluginVersion);
+        return templateService.processTemplate("build-gradle", variables);
+    }
+
+    public String getReadmeTemplate(ProjectRequest request) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("projectName", request.getProjectName());
+        variables.put("description", request.getDescription());
+        variables.put("javaVersion", request.getJavaVersion());
+        variables.put("gradleVersion", request.getGradleVersion());
+        variables.put("groupId", request.getGroupId());
+        variables.put("artifactId", request.getArtifactId());
+        variables.put("version", request.getVersion());
+        return templateService.processTemplate("readme", variables);
+    }
+
+    public String getGitignoreTemplate() {
+        return templateService.processTemplate("gitignore", new HashMap<>());
+    }
+}
+
+-----------------
+<hr></hr>
+Class: ApiModuleGenerator
+package com.socgen.unibank.services.autotest.model.generator;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.template.ApiModuleTemplates;
+import com.socgen.unibank.services.autotest.model.util.StringUtils;
+import com.socgen.unibank.services.utils.PathUtils;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.Set;
+import java.util.zip.ZipOutputStream;
+
+/**
+ * Générateur de module API amélioré.
+ * Cette classe est responsable de la génération des fichiers du module API d'un projet.
+ * Elle utilise la classe PathUtils pour construire des chemins de fichiers cohérents.
+ */
+@Component
+@RequiredArgsConstructor
+public class ApiModuleGenerator implements ProjectModuleGenerator {
+    private static final Logger log = LoggerFactory.getLogger(ApiModuleGenerator.class);
+    private final ApiModuleTemplates templates;
+    private static final String MODULE_NAME = "api";
+    private static final String DEFAULT_BASE_PACKAGE = "com.socgen.unibank.services";
+
+    @Override
+    public void generate(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException {
+        String projectName = request.getProjectName();
+        String pascalCaseName = StringUtils.toPascalCase(projectName);
+        String basePackage = request.getBasePackage() != null ? request.getBasePackage() : DEFAULT_BASE_PACKAGE;
+
+        log.debug("Generating API module for project: {}", projectName);
+
+        // Création des répertoires pour les fichiers Java
+        ensureDirectoriesExist(zos, projectName, basePackage, addedFiles);
+
+        // Génération du fichier build.gradle.kts
+        String buildGradlePath = PathUtils.buildModulePath(projectName, MODULE_NAME, "build.gradle.kts");
+        addToZip(zos, buildGradlePath, templates.getApiBuildGradleTemplate(), addedFiles);
+
+        // Génération des classes de modèle
+        generateApiModelClasses(zos, projectName, basePackage, addedFiles);
+
+        // Génération des interfaces de cas d'utilisation
+        generateApiUseCaseInterfaces(zos, projectName, basePackage, addedFiles);
+
+        // Génération de l'interface API principale
+        String apiSubPackage = "api";
+        String apiClassName = pascalCaseName + "API.java";
+        String projectAPIPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, apiSubPackage, apiClassName);
+        addToZip(zos, projectAPIPath, templates.getProjectApiTemplate(pascalCaseName), addedFiles);
+
+        log.info("API module generated successfully for project: {}", projectName);
+    }
+
+    /**
+     * Génère les classes de modèle de l'API.
+     */
+    private void generateApiModelClasses(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        String modelSubPackage = "api.model";
+
+        // Génération de la classe de requête
+        String requestClassName = "SgabsHelloworldRequest.java";
+        String requestPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, modelSubPackage, requestClassName);
+        addToZip(zos, requestPath, templates.getHelloWorldRequestTemplate(), addedFiles);
+
+        // Génération de la classe de réponse
+        String responseClassName = "SgabsHelloworldResponse.java";
+        String responsePath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, modelSubPackage, responseClassName);
+        addToZip(zos, responsePath, templates.getHelloWorldResponseTemplate(), addedFiles);
+    }
+
+    /**
+     * Génère les interfaces de cas d'utilisation de l'API.
+     */
+    private void generateApiUseCaseInterfaces(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        String usecaseSubPackage = "api.usecases";
+        String usecaseClassName = "CreateSgabsHelloWorld.java";
+        String usecasePath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, usecaseSubPackage, usecaseClassName);
+        addToZip(zos, usecasePath, templates.getCreateSgabsHelloWorldTemplate(), addedFiles);
+    }
+
+    /**
+     * Assure que les répertoires nécessaires existent dans l'archive ZIP.
+     */
+    private void ensureDirectoriesExist(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        // Répertoire de base du module
+        String moduleDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "");
+        createDirectories(zos, moduleDir, addedFiles);
+
+        // Répertoire src/main/java
+        String srcMainJavaDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "src/main/java/");
+        createDirectories(zos, srcMainJavaDir, addedFiles);
+
+        // Répertoire de package de base
+        String basePackageDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "", "");
+        createDirectories(zos, basePackageDir, addedFiles);
+
+        // Répertoire api
+        String apiDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "api", "");
+        createDirectories(zos, apiDir, addedFiles);
+
+        // Répertoire api/model
+        String modelDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "api.model", "");
+        createDirectories(zos, modelDir, addedFiles);
+
+        // Répertoire api/usecases
+        String usecasesDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "api.usecases", "");
+        createDirectories(zos, usecasesDir, addedFiles);
+    }
+}
+
+
+-------------
+package com.socgen.unibank.services.autotest.model.template;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class ApiModuleTemplates {
+
+    public String getApiBuildGradleTemplate() {
+        return """
+            plugins {
+                id 'java-library'
+            }
+
+            apply plugin: 'unibank.springboot.platform'
+            apply plugin: 'unibank.maven-publish'
+            apply plugin: 'unibank.kotlin'
+
+            dependencies {
+                api("com.socgen.unibank.core:unibank-core-domain:${property("unibank.domain_version")}")
+                api("com.socgen.unibank.core:unibank-core-platform-model:${property("unibank.domain_version")}")
+                compileOnly("org.projectlombok:lombok:${lombokVersion}")
+                implementation("org.springframework.boot:spring-boot-starter-web")
+                annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+            }
+            """;
+    }
+
+    public String getHelloWorldRequestTemplate() {
+        return """
+            package com.socgen.unibank.services.api.model;
+
+            import lombok.AllArgsConstructor;
+            import lombok.Data;
+            import lombok.NoArgsConstructor;
+
+            @Data
+            @NoArgsConstructor
+            @AllArgsConstructor
+            public class SgabsHelloWorldRequest {
+                private String message;
+            }
+            """;
+    }
+
+    public String getHelloWorldResponseTemplate() {
+        return """
+            package com.socgen.unibank.services.api.model;
+
+            import lombok.AllArgsConstructor;
+            import lombok.Data;
+            import lombok.NoArgsConstructor;
+
+            @Data
+            @NoArgsConstructor
+            @AllArgsConstructor
+            public class SgabsHelloWorldResponse {
+                private String message;
+            }
+            """;
+    }
+
+    public String getCreateSgabsHelloWorldTemplate() {
+        return """
+            package com.socgen.unibank.services.api.usecases;
+
+            import com.socgen.unibank.platform.models.RequestContext;
+            import com.socgen.unibank.platform.domain.Command;
+            import com.socgen.unibank.services.api.model.SgabsHelloWorldRequest;
+            import com.socgen.unibank.services.api.model.SgabsHelloWorldResponse;
+
+            public interface CreateSgabsHelloWorld extends Command {
+                SgabsHelloWorldResponse handle(SgabsHelloWorldRequest input, RequestContext context);
+            }
+            """;
+    }
+
+    public String getProjectApiTemplate(String pascalCaseName) {
+        return """
+            package com.socgen.unibank.services.api;
+
+            import com.socgen.unibank.platform.models.RequestContext;
+            import com.socgen.unibank.services.api.model.SgabsHelloWorldRequest;
+            import com.socgen.unibank.services.api.model.SgabsHelloWorldResponse;
+            import com.socgen.unibank.services.api.usecases.CreateSgabsHelloWorld;
+            import io.swagger.v3.oas.annotations.Operation;
+            import io.swagger.v3.oas.annotations.Parameter;
+            import io.swagger.v3.oas.annotations.tags.Tag;
+            import org.springframework.web.bind.annotation.*;
+
+            @Tag(name = "Hello world")
+            @RequestMapping(value = "sgabs", produces = "application/json")
+            public interface %sAPI extends CreateSgabsHelloWorld {
+
+                @Operation(
+                    summary = "Create a new SgabsHelloWorld",
+                    parameters = {
+                        @Parameter(ref = "entityIdHeader", required = true)
+                    }
+                )
+                @PostMapping("/sgabs-hello-world")
+                @Override
+                SgabsHelloWorldResponse handle(@RequestBody SgabsHelloWorldRequest input, RequestContext ctx);
+            }
+            """.formatted(pascalCaseName);
+    }
+}
+
+
+----------
+
+package com.socgen.unibank.services.autotest.model.generator;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.template.CoreModuleTemplates;
+import com.socgen.unibank.services.autotest.model.util.StringUtils;
+import com.socgen.unibank.services.utils.PathUtils;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.Set;
+import java.util.zip.ZipOutputStream;
+
+@Component
+@RequiredArgsConstructor
+public class CoreModuleGenerator implements ProjectModuleGenerator {
+    private static final Logger log = LoggerFactory.getLogger(CoreModuleGenerator.class);
+    private final CoreModuleTemplates templates;
+    private static final String MODULE_NAME = "core";
+    private static final String DEFAULT_BASE_PACKAGE = "com.socgen.unibank.services";
+
+    @Override
+    public void generate(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException {
+        String projectName = request.getProjectName();
+        String pascalCaseName = StringUtils.toPascalCase(projectName);
+        String basePackage = request.getBasePackage() != null ? request.getBasePackage() : DEFAULT_BASE_PACKAGE;
+
+        log.debug("Generating core module for project: {}", projectName);
+
+        // Création des répertoires pour les fichiers Java
+        ensureDirectoriesExist(zos, projectName, basePackage, addedFiles);
+
+        // Génération du fichier build.gradle.kts
+        String buildGradlePath = PathUtils.buildModulePath(projectName, MODULE_NAME, "build.gradle.kts");
+        addToZip(zos, buildGradlePath, templates.getCoreBuildGradleTemplate(projectName), addedFiles);
+
+        // Génération du fichier lombok.config
+        String lombokConfigPath = PathUtils.buildModulePath(projectName, MODULE_NAME, "lombok.config");
+        addToZip(zos, lombokConfigPath, templates.getLombokConfigTemplate(), addedFiles);
+
+        // Génération de l'implémentation du cas d'utilisation
+        String usecaseSubPackage = "core.usecases";
+        String implClassName = "CreateSgabsHelloWorldImpl.java";
+        String implPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, usecaseSubPackage, implClassName);
+        addToZip(zos, implPath, templates.getUseCaseImplTemplate(), addedFiles);
+
+        log.info("Core module generated successfully for project: {}", projectName);
+    }
+
+    /**
+     * Assure que les répertoires nécessaires existent dans l'archive ZIP.
+     */
+    private void ensureDirectoriesExist(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        // Répertoire de base du module
+        String moduleDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "");
+        createDirectories(zos, moduleDir, addedFiles);
+
+        // Répertoire src/main/java
+        String srcMainJavaDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "src/main/java/");
+        createDirectories(zos, srcMainJavaDir, addedFiles);
+
+        // Répertoire de package de base
+        String basePackageDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "", "");
+        createDirectories(zos, basePackageDir, addedFiles);
+
+        // Répertoire core/usecases
+        String usecasesDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "core.usecases", "");
+        createDirectories(zos, usecasesDir, addedFiles);
+    }
+}
+
+--------------
+package com.socgen.unibank.services.autotest.model.template;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class CoreModuleTemplates {
+
+    public String getCoreBuildGradleTemplate(String projectName) {
+        return """
+            plugins {
+                id 'java-library'
+            }
+
+            apply(plugin = "unibank.springboot.platform")
+            apply(plugin = "unibank.maven-publish")
+            apply(plugin = "unibank.junits")
+            apply(plugin = "foundation-qa-coverage-silver")
+
+            dependencies {
+                api("com.socgen.unibank.platform:unibank-platform-core:${property("unibank.platform_version")}")
+                api("com.socgen.unibank.platform:unibank-platform-springboot:${property("unibank.platform_version")}")
+                testImplementation("com.socgen.unibank.platform:unibank-platform-springboot-test:${property("unibank.platform_version")}")
+                compileOnly("org.junit.jupiter:junit-jupiter-api:${junitVersion}")
+                implementation("org.projectlombok:lombok:${lombokVersion}")
+                annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+                implementation(project(":%s-api"))
+            }
+            """.formatted(projectName);
+    }
+
+    public String getLombokConfigTemplate() {
+        return """
+            config.stopBubbling = true
+            lombok.addLombokGeneratedAnnotation = true
+            """;
+    }
+
+    public String getUseCaseImplTemplate() {
+        return """
+            package com.socgen.unibank.services.core.usecases;
+
+            import com.socgen.unibank.platform.models.RequestContext;
+            import com.socgen.unibank.services.api.model.SgabsHelloWorldRequest;
+            import com.socgen.unibank.services.api.model.SgabsHelloWorldResponse;
+            import com.socgen.unibank.services.api.usecases.CreateSgabsHelloWorld;
+            import org.springframework.stereotype.Service;
+
+            @Service
+            public class CreateSgabsHelloWorldImpl implements CreateSgabsHelloWorld {
+
+                @Override
+                public SgabsHelloWorldResponse handle(SgabsHelloWorldRequest input, RequestContext context) {
+                    // Implémentation de la logique de création
+                    return new SgabsHelloWorldResponse("Hello, " + input.getMessage());
+                }
+            }
+            """;
+    }
+}
+
+---------------
+
+package com.socgen.unibank.services.autotest.model.generator;
+
+import com.socgen.unibank.services.autotest.model.model.ProjectRequest;
+import com.socgen.unibank.services.autotest.model.template.GatewaysModuleTemplates;
+import com.socgen.unibank.services.autotest.model.util.StringUtils;
+import com.socgen.unibank.services.utils.PathUtils;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.util.Set;
+import java.util.zip.ZipOutputStream;
+
+@Component
+@RequiredArgsConstructor
+public class GatewaysModuleGenerator implements ProjectModuleGenerator {
+    private static final Logger log = LoggerFactory.getLogger(GatewaysModuleGenerator.class);
+    private final GatewaysModuleTemplates templates;
+    private static final String MODULE_NAME = "gateways";
+    private static final String DEFAULT_BASE_PACKAGE = "com.socgen.unibank.services";
+
+    @Override
+    public void generate(ZipOutputStream zos, ProjectRequest request, Set<String> addedFiles) throws IOException {
+        String projectName = request.getProjectName();
+        String pascalCaseName = StringUtils.toPascalCase(projectName);
+        String basePackage = request.getBasePackage() != null ? request.getBasePackage() : DEFAULT_BASE_PACKAGE;
+
+        log.debug("Generating gateways module for project: {}", projectName);
+
+        // Création des répertoires pour les fichiers Java
+        ensureDirectoriesExist(zos, projectName, basePackage, addedFiles);
+
+        // Génération du fichier build.gradle.kts
+        String buildGradlePath = PathUtils.buildModulePath(projectName, MODULE_NAME, "build.gradle.kts");
+        addToZip(zos, buildGradlePath, templates.getBuildGradleTemplate(projectName), addedFiles);
+
+        // Génération de la classe principale Spring Boot
+        String mainClassName = "Service" + pascalCaseName + ".java";
+        String mainClassPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, "", mainClassName);
+        addToZip(zos, mainClassPath, templates.getMainClassTemplate(pascalCaseName), addedFiles);
+
+        // Génération des ressources de configuration
+        generateServiceResources(zos, request, projectName, addedFiles);
+
+        // Génération des fichiers de sécurité
+        generateSecurityResources(zos, projectName, addedFiles);
+
+        // Génération de l'interface gateway/inbound
+        String inboundSubPackage = "gateway.inbound";
+        String endpointClassName = pascalCaseName + "Endpoint.java";
+        String interfacePath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, inboundSubPackage, endpointClassName);
+        addToZip(zos, interfacePath, templates.getGatewayInterfaceTemplate(pascalCaseName), addedFiles);
+
+        // Génération de la BeansFactory
+        String gatewaySubPackage = "gateway";
+        String beansFactoryClassName = pascalCaseName + "BeansFactory.java";
+        String beanFactoryPath = PathUtils.buildJavaPath(
+                projectName, MODULE_NAME, basePackage, gatewaySubPackage, beansFactoryClassName);
+        addToZip(zos, beanFactoryPath, templates.getBeansFactoryTemplate(pascalCaseName), addedFiles);
+
+        log.info("Gateways module generated successfully for project: {}", projectName);
+    }
+
+    private void generateServiceResources(ZipOutputStream zos, ProjectRequest request, String projectName, Set<String> addedFiles) throws IOException {
+        // Création du répertoire resources
+        String resourcesDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "src/main/resources/");
+        createDirectories(zos, resourcesDir, addedFiles);
+
+        // application.yml
+        String applicationYmlPath = PathUtils.buildResourcePath(projectName, MODULE_NAME, "application.yml");
+        addToZip(zos, applicationYmlPath, templates.getApplicationYmlTemplate(projectName.toLowerCase()), addedFiles);
+
+        // application-local.yml
+        String applicationLocalYmlPath = PathUtils.buildResourcePath(projectName, MODULE_NAME, "application-local.yml");
+        addToZip(zos, applicationLocalYmlPath, templates.getApplicationLocalYmlTemplate(projectName.toLowerCase()), addedFiles);
+
+        // application-test.yml
+        String applicationTestYmlPath = PathUtils.buildResourcePath(projectName, MODULE_NAME, "application-test.yml");
+        addToZip(zos, applicationTestYmlPath, templates.getApplicationTestYmlTemplate(), addedFiles);
+
+        // application-vault.yml
+        String applicationVaultYmlPath = PathUtils.buildResourcePath(projectName, MODULE_NAME, "application-vault.yml");
+        addToZip(zos, applicationVaultYmlPath, templates.getApplicationVaultYmlTemplate(projectName.toLowerCase()), addedFiles);
+    }
+
+    private void generateSecurityResources(ZipOutputStream zos, String projectName, Set<String> addedFiles) throws IOException {
+        // Création du répertoire security
+        String securityDir = PathUtils.buildResourcePath(projectName, MODULE_NAME, "security/");
+        createDirectories(zos, securityDir, addedFiles);
+
+        String[] securityFiles = {
+                "unibank-dev-jwk-pub.json",
+                "unibank-hf2-jwk-pub.json",
+                "unibank-hf-jwk-pub.json",
+                "unibank-ht-jwk-pub.json"
+        };
+        for (String fileName : securityFiles) {
+            String path = PathUtils.buildResourcePath(projectName, MODULE_NAME, "security/" + fileName);
+            addToZip(zos, path, templates.getSecurityJsonTemplate(), addedFiles);
+        }
+    }
+
+    /**
+     * Assure que les répertoires nécessaires existent dans l'archive ZIP.
+     */
+    private void ensureDirectoriesExist(ZipOutputStream zos, String projectName, String basePackage, Set<String> addedFiles) throws IOException {
+        // Répertoire de base du module
+        String moduleDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "");
+        createDirectories(zos, moduleDir, addedFiles);
+
+        // Répertoire src/main/java
+        String srcMainJavaDir = PathUtils.buildModulePath(projectName, MODULE_NAME, "src/main/java/");
+        createDirectories(zos, srcMainJavaDir, addedFiles);
+
+        // Répertoire de package de base
+        String basePackageDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "", "");
+        createDirectories(zos, basePackageDir, addedFiles);
+
+        // Répertoire gateway
+        String gatewayDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "gateway", "");
+        createDirectories(zos, gatewayDir, addedFiles);
+
+        // Répertoire gateway/inbound
+        String inboundDir = PathUtils.buildJavaPath(projectName, MODULE_NAME, basePackage, "gateway.inbound", "");
+        createDirectories(zos, inboundDir, addedFiles);
+    }
+}
+
+----------
+
+package com.socgen.unibank.services.autotest.model.template;
+
+import org.springframework.stereotype.Component;
+
+@Component
+public class GatewaysModuleTemplates {
+
+    public String getBuildGradleTemplate(String projectName) {
+        return """
+            plugins {
+                id 'java-library'
+            }
+
+            apply(plugin = "unibank.service")
+            apply(plugin = "foundation-qa-coverage-bronze")
+            apply(plugin = "foundation-qa")
+
+            dependencies {
+                api("com.socgen.unibank.core:unibank-core-domain")
+                api("com.socgen.unibank.platform:unibank-platform-core")
+                implementation("commons-io:commons-io:2.11.0")
+                implementation("org.apache.commons:commons-collections4:4.4")
+                implementation(project(mapOf("path" to ":%s-api")))
+                compileOnly("org.projectlombok:lombok:${lombokVersion}")
+                annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+                implementation(project(":%s-core"))
+            }
+            """.formatted(projectName, projectName);
+    }
+
+    public String getMainClassTemplate(String pascalCaseName) {
+        return """
+            package com.socgen.unibank.services;
+
+            import org.springframework.boot.SpringApplication;
+            import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+            @SpringBootApplication
+            public class Service%s {
+                public static void main(String[] args) {
+                    SpringApplication.run(Service%s.class, args);
+                }
+            }
+            """.formatted(pascalCaseName, pascalCaseName);
+    }
+
+    public String getGatewayInterfaceTemplate(String pascalCaseName) {
+        return """
+            package com.socgen.unibank.services.gateway.inbound;
+
+            import org.springframework.graphql.data.method.annotation.GraphQLController;
+            import org.springframework.web.bind.annotation.RestController;
+
+            @GraphQLController
+            @RestController
+            public interface %sEndpoint extends %sAPI {
+            }
+            """.formatted(pascalCaseName, pascalCaseName);
+    }
+
+    public String getBeansFactoryTemplate(String pascalCaseName) {
+        return """
+            package com.socgen.unibank.services.gateway;
+
+            import com.socgen.unibank.platform.springboot.config.ProxyEndpoints;
+            import com.socgen.unibank.services.gateway.inbound.%sEndpoint;
+            import org.springframework.context.annotation.Bean;
+            import org.springframework.context.annotation.Configuration;
+
+            @Configuration
+            public class %sBeansFactory {
+
+                @Bean
+                ProxyEndpoints createContentAPIEndpoints() {
+                    return ProxyEndpoints.create(%sEndpoint.class);
+                }
+            }
+            """.formatted(pascalCaseName, pascalCaseName, pascalCaseName);
+    }
+
+    public String getApplicationYmlTemplate(String projectNameLowerCase) {
+        return """
+            spring:
+              application:
+                name: unibank-service-%s
+              profiles:
+                group:
+                  local: embedded-rabbitmg,database-migration
+                  test: unibank-test
+              include:
+                - unibank-core
+                - unibank-persistence-simple
+              cloud:
+                vault:
+                  enabled: false
+                  kv:
+                    enabled: false
+              jpa:
+                show-sql: true
+              properties:
+                hibernate:
+                  format_sql: true
+              logging:
+                level:
+                  org:
+                    hibernate:
+                      type: trace
+              unibank.service.persistence.tenants: 'unibank.components.db.entities*'
+            """.formatted(projectNameLowerCase);
+    }
+
+    public String getApplicationLocalYmlTemplate(String projectNameLowerCase) {
+        return """
+            spring:
+              application:
+                name: unibank-service-%s
+              unibank:
+                service:
+                  bridge:
+                    embedded: false
+                  components:
+                    db:
+                      default: h2://sa@file:./build/db/unibank;SCHEMA=BF
+                  service:
+                    security:
+                      jwk-location: classpath:/security/unibank-dev-jwk-pub.json,classpath:/security/unibank-hf-jwk-pub.json
+              server:
+                port: 8082
+              unibank:
+                components:
+                  s3:
+                    public:
+                      endpoint: https://gggghhhxxxx
+                      access-key: xxxx
+                      secret-key: xxx
+                      bucket: reporting
+                      disableCertChecking: true
+            """.formatted(projectNameLowerCase);
+    }
+
+    public String getApplicationTestYmlTemplate() {
+        return """
+            spring:
+              mvc:
+                format:
+                  date: yyyy-MM-dd
+                  date-time: yyyy-MM-dd HH:mm:ss
+              unibank:
+                components:
+                  db:
+                    entities:
+                      CI: h2://sa@file:./build/db/unibank;SCHEMA=CI
+                      CM: h2://sa@file:./build/db/unibank;SCHEMA=CM
+                      GH: h2://sa@file:../build/db/unibank;SCHEMA=GH
+                      GN: h2://sa@file:../build/db/unibank;SCHEMA=GN
+                      SN: h2://sa@file:../build/db/unibank;SCHEMA=SN
+              unibank:
+                service:
+                  security:
+                    jwk-location: /security/unibank-ht-jwk-pub.json
+              server:
+                port: 8081
+            """;
+    }
+
+    public String getApplicationVaultYmlTemplate(String projectNameLowerCase) {
+        return """
+            spring:
+              application:
+                name: unibank-service-%s
+              cloud:
+                vault:
+                  session:
+                    lifecycle:
+                      enabled: false
+                  config:
+                    lifecycle:
+                      enabled: false
+                  authentication: ${VAULT_AUTH:TOKEN}
+                  enabled: ${VAULT_ENABLED:false}
+                  fail-fast: true
+                  kv:
+                    enabled: ${VAULT_ENABLED:false}
+                    default-context: ${VAULT_CONTEXT:unibank-service}
+                  uri: ${VAULT_URI:http://localhost:8200}
+                  connection-timeout: 5000
+                  read-timeout: 15000
+                  namespace: ${VAULT_NAMESPACE:}
+                  app-role:
+                    role-id: ${VAULT_ROLE_ID:xxxxx}
+                    secret-id: ${VAULT_SECRET_ID:xxxxx}
+            """.formatted(projectNameLowerCase);
+    }
+
+    public String getSecurityJsonTemplate() {
+        return """
+            {
+                "keys": []
+            }
+            """;
+    }
+}
+
+-----------------
+package com.socgen.unibank.services.utils;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+/**
+ * Classe utilitaire pour la génération et la normalisation des chemins de fichiers.
+ * Cette classe fournit des méthodes pour construire des chemins cohérents pour les différents
+ * modules et fichiers du projet.
+ */
+public class PathUtils {
+
+    /**
+     * Normalise un chemin de fichier pour assurer la compatibilité entre les systèmes d'exploitation.
+     *
+     * @param path le chemin à normaliser
+     * @return le chemin normalisé
+     */
+    public static String normalizePath(String path) {
+        return path.replace("\\", "/");
+    }
+
+    /**
+     * Construit un chemin de fichier pour un module spécifique.
+     *
+     * @param projectName le nom du projet
+     * @param moduleName le nom du module (api, core, gateways, etc.)
+     * @param relativePath le chemin relatif dans le module
+     * @return le chemin complet normalisé
+     */
+    public static String buildModulePath(String projectName, String moduleName, String relativePath) {
+        String path = String.format("%s-%s/%s", projectName, moduleName, relativePath);
+        return normalizePath(path);
+    }
+
+    /**
+     * Construit un chemin de fichier pour un fichier à la racine du projet.
+     *
+     * @param fileName le nom du fichier
+     * @return le chemin normalisé
+     */
+    public static String buildRootPath(String fileName) {
+        return normalizePath(fileName);
+    }
+
+    /**
+     * Construit un chemin de fichier Java basé sur le package.
+     *
+     * @param projectName le nom du projet
+     * @param moduleName le nom du module (api, core, gateways, etc.)
+     * @param basePackage le package de base
+     * @param subPackage le sous-package (peut être null ou vide)
+     * @param className le nom de la classe avec extension
+     * @return le chemin complet normalisé
+     */
+    public static String buildJavaPath(String projectName, String moduleName, String basePackage,
+                                      String subPackage, String className) {
+        String packagePath = basePackage.replace('.', '/');
+        if (subPackage != null && !subPackage.isEmpty()) {
+            packagePath = packagePath + "/" + subPackage.replace('.', '/');
+        }
+
+        String path = String.format("%s-%s/src/main/java/%s/%s",
+                projectName, moduleName, packagePath, className);
+        return normalizePath(path);
+    }
+
+    /**
+     * Construit un chemin de fichier de ressource.
+     *
+     * @param projectName le nom du projet
+     * @param moduleName le nom du module (api, core, gateways, etc.)
+     * @param resourcePath le chemin relatif de la ressource
+     * @return le chemin complet normalisé
+     */
+    public static String buildResourcePath(String projectName, String moduleName, String resourcePath) {
+        String path = String.format("%s-%s/src/main/resources/%s",
+                projectName, moduleName, resourcePath);
+        return normalizePath(path);
+    }
+
+    /**
+     * Construit un chemin de fichier de test.
+     *
+     * @param projectName le nom du projet
+     * @param moduleName le nom du module (api, core, gateways, etc.)
+     * @param basePackage le package de base
+     * @param subPackage le sous-package (peut être null ou vide)
+     * @param className le nom de la classe de test avec extension
+     * @return le chemin complet normalisé
+     */
+    public static String buildTestPath(String projectName, String moduleName, String basePackage,
+                                     String subPackage, String className) {
+        String packagePath = basePackage.replace('.', '/');
+        if (subPackage != null && !subPackage.isEmpty()) {
+            packagePath = packagePath + "/" + subPackage.replace('.', '/');
+        }
+
+        String path = String.format("%s-%s/src/test/java/%s/%s",
+                projectName, moduleName, packagePath, className);
+        return normalizePath(path);
+    }
+
+    /**
+     * Extrait le répertoire parent d'un chemin de fichier.
+     *
+     * @param filePath le chemin du fichier
+     * @return le chemin du répertoire parent
+     */
+    public static String getParentDirectory(String filePath) {
+        String normalizedPath = normalizePath(filePath);
+        int lastSlashIndex = normalizedPath.lastIndexOf('/');
+        if (lastSlashIndex > 0) {
+            return normalizedPath.substring(0, lastSlashIndex + 1);
+        }
+        return "";
+    }
+}
+
+-----------------
+package com.socgen.unibank.services.autotest.model.exception;
+
+/**
+ * Exception lancée lorsqu'une erreur survient pendant la génération d'un projet.
+ */
+public class ProjectGenerationException extends RuntimeException {
+
+    /**
+     * Crée une nouvelle instance de ProjectGenerationException avec le message spécifié.
+     *
+     * @param message le message d'erreur
+     */
+    public ProjectGenerationException(String message) {
+        super(message);
+    }
+
+    /**
+     * Crée une nouvelle instance de ProjectGenerationException avec le message et la cause spécifiés.
+     *
+     * @param message le message d'erreur
+     * @param cause la cause de l'exception
+     */
+    public ProjectGenerationException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+
+/**
+ * Exception lancée lorsqu'une erreur survient pendant le traitement d'un template.
+ */
+public class TemplateProcessingException extends RuntimeException {
+
+    /**
+     * Crée une nouvelle instance de TemplateProcessingException avec le message spécifié.
+     *
+     * @param message le message d'erreur
+     */
+    public TemplateProcessingException(String message) {
+        super(message);
+    }
+
+    /**
+     * Crée une nouvelle instance de TemplateProcessingException avec le message et la cause spécifiés.
+     *
+     * @param message le message d'erreur
+     * @param cause la cause de l'exception
+     */
+    public TemplateProcessingException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+
+
+
+
+---------
+{
+    "projectName": "sgabs-demo",
+    "javaVersion": "17",
+    "gradleVersion": "7.5",
+    "groupId": "com.socgen.unibank.services",
+    "artifactId": "sgabs-demo",
+    "description": "Demo project for SGABS",
+    "version": "1.0.0",
+    "unibankDomainVersion": "3.7.79",
+    "unibankPlatformVersion": "3.2-95",
+    "lombokVersion": "1.18.26",
+    "junitVersion": "5.9.2",
+    "basePackage": "com.socgen.unibank.services",
+    "includeSwagger": true,
+    "includeTestContainers": false
+}
