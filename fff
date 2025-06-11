@@ -1,0 +1,64 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { DataLoader } from '@unibank/react'; // Ajustez le chemin selon votre structure de projet
+
+// Interface pour les données de test
+interface TestData {
+  id: string;
+  name: string;
+  value: number;
+}
+
+// Mock de la fonction loader
+const mockLoader = jest.fn();
+
+// Données de test
+const testData: TestData[] = [
+  { id: '1', name: 'Item 1', value: 100 },
+  { id: '2', name: 'Item 2', value: 200 }
+];
+
+// Composants pour les différents états du DataLoader
+const MockSkeletonComponent = () => <div data-testid="skeleton">Chargement...</div>;
+const MockErrorComponent = ({ onReload }: { onReload: () => void }) => (
+  <div data-testid="error">
+    <p>Erreur de chargement</p>
+    <button onClick={onReload} data-testid="error-reload">Réessayer</button>
+  </div>
+);
+const MockRenderComponent = ({ data, reload }: { data: TestData[], reload: () => void }) => (
+  <div data-testid="content">
+    <ul>
+      {data.map(item => (
+        <li key={item.id} data-testid={`item-${item.id}`}>
+          {item.name}: {item.value}
+        </li>
+      ))}
+    </ul>
+    <button onClick={reload} data-testid="content-reload">Recharger</button>
+  </div>
+);
+
+describe('Test direct du composant DataLoader', () => {
+  // Réinitialiser les mocks avant chaque test
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  // Test 1: Vérifier que le DataLoader appelle correctement la fonction loader
+  test('appelle la fonction loader au montage du composant', () => {
+    mockLoader.mockReturnValue(new Promise(() => {}));
+
+    render(
+      <DataLoader<TestData[]>
+        loader={mockLoader}
+        skeleton={<MockSkeletonComponent />}
+        error={<MockErrorComponent onReload={() => mockLoader()} />}
+        render={(data, reload) => <MockRenderComponent data={data} reload={reload} />}
+      />
+    );
+
+    // Vérifier que le loader a été appelé
+    expect(mockLoader).toHaveBeenCalledTimes(1);
+  });
