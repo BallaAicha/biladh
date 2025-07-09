@@ -1,0 +1,407 @@
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { APIService } from '../../types/api';
+import { useManageTechItem } from '../../hooks/apis/useManageTechItem';
+import {
+    Shield,
+    GitBranch,
+    CheckCircle2,
+    AlertCircle,
+    Calendar,
+    User,
+    Code,
+    ChevronRight,
+    Search,
+    BarChart3,
+    Activity
+} from 'lucide-react';
+import clsx from 'clsx';
+
+interface ServicesListProps {
+    services: APIService[];
+    selectedService: APIService | null;
+    onSelectService: (service: APIService) => void;
+}
+
+const ServicesList: React.FC<ServicesListProps> = ({
+    services,
+    onSelectService
+}) => {
+    const [currentEnvironmentIndex, setCurrentEnvironmentIndex] = useState(0);
+    const manageTechItem = useManageTechItem();
+
+    // Définition des environnements à afficher (correction des clés pour correspondre à Infrastructure)
+    const environments = [
+        { name: 'PROD', key: 'urlProd' },
+        { name: 'HT', key: 'urlHt' },
+        { name: 'HF', key: 'urlHf' },
+        { name: 'DEV', key: 'urlDev' }
+    ];
+
+    // Rotation des environnements toutes les 10 secondes
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentEnvironmentIndex((prevIndex) =>
+                (prevIndex + 1) % environments.length
+            );
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, [environments.length]);
+
+    // Fonction pour obtenir la version actuelle selon l'environnement
+    const getCurrentVersion = (service: APIService) => {
+        const currentEnv = environments[currentEnvironmentIndex];
+        const version = service.infrastructure?.[currentEnv.key as keyof typeof service.infrastructure];
+
+        if (version) {
+            return { environment: currentEnv.name, version };
+        }
+
+        // Fallback vers la version générale si pas de version spécifique
+        return { environment: 'Version', version: service.version || '1.0' };
+    };
+
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1,
+                duration: 0.6,
+                ease: [0.6, -0.05, 0.01, 0.99]
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { y: 20, opacity: 0 },
+        visible: {
+            y: 0,
+            opacity: 1,
+            transition: {
+                type: "spring",
+                stiffness: 100,
+                damping: 15
+            }
+        }
+    };
+
+    const getCriticalityData = (criticality: string) => {
+        switch (criticality?.toLowerCase()) {
+            case 'critique':
+                return {
+                    color: 'bg-red-50 text-red-700 border-red-200',
+                    badgeColor: 'bg-gradient-to-r from-red-600 to-red-700',
+                    hoverColor: 'group-hover:bg-red-100',
+                    highlightColor: 'bg-red-700/5',
+                    icon: <AlertCircle className="w-4 h-4" />,
+                    label: 'Criticité Critique',
+                    progressColor: 'from-red-500 to-red-600'
+                };
+            case 'haute':
+                return {
+                    color: 'bg-orange-50 text-orange-700 border-orange-200',
+                    badgeColor: 'bg-gradient-to-r from-orange-500 to-orange-600',
+                    hoverColor: 'group-hover:bg-orange-100',
+                    highlightColor: 'bg-orange-700/5',
+                    icon: <Shield className="w-4 h-4" />,
+                    label: 'Criticité Haute',
+                    progressColor: 'from-orange-500 to-orange-600'
+                };
+            case 'moyenne':
+                return {
+                    color: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                    badgeColor: 'bg-gradient-to-r from-yellow-500 to-yellow-600',
+                    hoverColor: 'group-hover:bg-yellow-100',
+                    highlightColor: 'bg-yellow-700/5',
+                    icon: <Shield className="w-4 h-4" />,
+                    label: 'Criticité Moyenne',
+                    progressColor: 'from-yellow-500 to-yellow-600'
+                };
+            case 'basse':
+                return {
+                    color: 'bg-green-50 text-green-700 border-green-200',
+                    badgeColor: 'bg-gradient-to-r from-green-500 to-green-600',
+                    hoverColor: 'group-hover:bg-green-100',
+                    highlightColor: 'bg-green-700/5',
+                    icon: <CheckCircle2 className="w-4 h-4" />,
+                    label: 'Criticité Basse',
+                    progressColor: 'from-green-500 to-green-600'
+                };
+            default:
+                return {
+                    color: 'bg-gray-50 text-gray-700 border-gray-200',
+                    badgeColor: 'bg-gradient-to-r from-gray-600 to-gray-700',
+                    hoverColor: 'group-hover:bg-gray-100',
+                    highlightColor: 'bg-gray-700/5',
+                    icon: <Shield className="w-4 h-4" />,
+                    label: 'Criticité Non définie',
+                    progressColor: 'from-gray-500 to-gray-600'
+                };
+        }
+    };
+
+    if (services.length === 0) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, ease: [0.6, -0.05, 0.01, 0.99] }}
+                className="text-center py-24 bg-white rounded-2xl shadow-xl border border-neutral-100"
+            >
+                <div className="flex flex-col items-center justify-center space-y-6">
+                    <motion.div
+                        className="p-6 rounded-full bg-neutral-50 shadow-inner"
+                        animate={{
+                            scale: [1, 1.1, 1],
+                            rotate: [0, 10, -10, 0]
+                        }}
+                        transition={{
+                            duration: 2,
+                            ease: "easeInOut",
+                            repeat: Infinity,
+                            repeatDelay: 1
+                        }}
+                    >
+                        <Search className="w-12 h-12 text-neutral-400" />
+                    </motion.div>
+                    <div className="space-y-2">
+                        <h3 className="text-2xl font-bold text-neutral-800">Aucun service trouvé</h3>
+                        <p className="text-neutral-500 max-w-md mx-auto">
+                            Aucun service ne correspond à votre recherche. Veuillez modifier vos critères et réessayer.
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    }
+
+    return (
+        <motion.div
+            className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
+            <AnimatePresence>
+                {services.map((service) => {
+                    const criticalityData = getCriticalityData(service.criticality);
+                    const currentVersion = getCurrentVersion(service);
+
+                    return (
+                        <motion.div
+                            key={service.id}
+                            variants={itemVariants}
+                            whileHover={{
+                                y: -8,
+                                transition: { duration: 0.2 }
+                            }}
+                            className={clsx(
+                                "group bg-white rounded-2xl border border-neutral-200 overflow-hidden transition-all cursor-pointer",
+                                "hover:border-primary-300 hover:shadow-2xl hover:shadow-primary-500/10 relative"
+                            )}
+                            onClick={() => onSelectService(service)}
+                        >
+                            {/* Criticality indicator line at top */}
+                            <div className={`h-2 w-full ${criticalityData.badgeColor}`}></div>
+
+                            <div className="p-8 space-y-6">
+                                {/* Header with name and badge */}
+                                <div className="flex items-start justify-between">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center space-x-3">
+                                            <h2 className="font-bold text-2xl text-neutral-900 group-hover:text-primary-700 transition-colors">
+                                                {service.name}
+                                            </h2>
+                                            <span className="px-3 py-1 bg-neutral-100 text-neutral-600 rounded-full text-sm font-medium tracking-wide">
+                                                {service.trigramme}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${criticalityData.color} shadow-sm`}>
+                                                {criticalityData.icon}
+                                                <span className="ml-1.5 capitalize">{service.criticality || 'Non définie'}</span>
+                                            </span>
+
+                                            {service.bridgeCommunication && (
+                                                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 shadow-sm">
+                                                    <GitBranch className="w-3.5 h-3.5 mr-1.5" />
+                                                    Bridge
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <motion.span
+                                        key={`${service.id}-${currentEnvironmentIndex}`}
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ duration: 0.3, ease: "easeOut" }}
+                                        className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200 shadow-sm"
+                                    >
+                                        {currentVersion.environment} - v{currentVersion.version}
+                                    </motion.span>
+                                </div>
+
+                                {/* Description section */}
+                                <div className={`p-4 rounded-xl ${criticalityData.highlightColor} border border-${criticalityData.color.split(' ')[1]} backdrop-blur-sm`}>
+                                    <p className="text-neutral-700 line-clamp-2 leading-relaxed">
+                                        {service.description}
+                                    </p>
+                                </div>
+
+                                {/* Team information */}
+                                <div className="grid grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <h4 className="text-xs font-bold uppercase text-neutral-500 tracking-wider flex items-center">
+                                            <Activity className="w-3.5 h-3.5 mr-1.5" />
+                                            Équipe
+                                        </h4>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="h-9 w-9 rounded-xl bg-primary-100 flex items-center justify-center text-primary-700 shadow-sm">
+                                                    <User className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <span className="text-xs text-neutral-500 block">PO/CoEDev</span>
+                                                    <span className="font-semibold text-neutral-900">{service.poCoedev || 'N/A'}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center space-x-3">
+                                                <div className="h-9 w-9 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 shadow-sm">
+                                                    <Code className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <span className="text-xs text-neutral-500 block">Techlead</span>
+                                                    <span className="font-semibold text-neutral-900">{service.techlead || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Technical information */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-xs font-bold uppercase text-neutral-500 tracking-wider flex items-center">
+                                            <BarChart3 className="w-3.5 h-3.5 mr-1.5" />
+                                            TECH
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {/* Affichage des environnements comme boutons vers Swagger */}
+                                            <div className="flex flex-wrap gap-2 mb-2">
+                                                {environments.map(env => {
+                                                    const url = service.infrastructure?.[env.key as keyof typeof service.infrastructure];
+                                                    if (!url) return null;
+                                                    return (
+                                                        <a
+                                                            key={env.key}
+                                                            href={`${url.replace(/\/$/, '')}/swagger-ui`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-block px-3 py-1.5 rounded-full text-xs font-medium border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors shadow-sm"
+                                                            onClick={e => e.stopPropagation()}
+                                                        >
+                                                            {env.name}
+                                                        </a>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-medium text-neutral-700">Java 17</span>
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className={`text-xs font-semibold ${service.java17Migrated ? 'text-green-600' : 'text-red-600'}`}>
+                                                            {service.java17Migrated ? 'Migré' : 'Non migré'}
+                                                        </span>
+                                                        <button
+                                                            className="text-xs font-medium text-neutral-500 hover:text-neutral-700 p-1 rounded-full hover:bg-neutral-100"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                // Toggle the status
+                                                                const newStatus = !service.java17Migrated;
+                                                                manageTechItem.mutate({
+                                                                    serviceId: service.id,
+                                                                    techItemName: "java17",
+                                                                    enabled: newStatus
+                                                                });
+                                                            }}
+                                                        >
+                                                            {service.java17Migrated ? 'Désactiver' : 'Activer'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: service.java17Migrated ? '100%' : '0%' }}
+                                                        transition={{ duration: 1, ease: "easeOut" }}
+                                                        className={`h-full rounded-full bg-gradient-to-r ${service.java17Migrated ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600'}`}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm font-medium text-neutral-700">Sonarization</span>
+                                                    <div className="flex items-center space-x-2">
+                                                        <span className={`text-xs font-semibold ${service.sonarized ? 'text-green-600' : 'text-red-600'}`}>
+                                                            {service.sonarized ? 'Sonarisé' : 'Non sonarisé'}
+                                                        </span>
+                                                        <button
+                                                            className="text-xs font-medium text-neutral-500 hover:text-neutral-700 p-1 rounded-full hover:bg-neutral-100"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                // Toggle the status
+                                                                const newStatus = !service.sonarized;
+                                                                manageTechItem.mutate({
+                                                                    serviceId: service.id,
+                                                                    techItemName: "sonarization",
+                                                                    enabled: newStatus
+                                                                });
+                                                            }}
+                                                        >
+                                                            {service.sonarized ? 'Désactiver' : 'Activer'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div className="w-full h-2 bg-neutral-100 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: service.sonarized ? '100%' : '0%' }}
+                                                        transition={{ duration: 1, ease: "easeOut" }}
+                                                        className={`h-full rounded-full bg-gradient-to-r ${service.sonarized ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600'}`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Footer */}
+                                <div className="pt-4 border-t border-neutral-100">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center text-neutral-500 text-xs">
+                                            <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                                            Mis à jour le {new Date().toLocaleDateString('fr-FR', {
+                                                day: '2-digit',
+                                                month: '2-digit',
+                                                year: 'numeric'
+                                            })}
+                                        </div>
+                                        <button className="text-primary-600 font-medium text-sm flex items-center group-hover:text-primary-700">
+                                            Détails
+                                            <ChevronRight className="w-4 h-4 ml-1 transform transition-transform group-hover:translate-x-1" />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    );
+                })}
+            </AnimatePresence>
+        </motion.div>
+    );
+};
+
+export default ServicesList;
