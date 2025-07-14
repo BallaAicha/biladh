@@ -1,0 +1,51 @@
+Titre du sujet
+Générateur de jeux de données de test réalistes et anonymisés
+
+Contexte
+Dans le cadre de la digitalisation et de la modernisation des pratiques de développement, la préparation de jeux de données de test est un enjeu majeur pour la qualité des livrables >
+
+Actuellement, la création de ces jeux de données est souvent manuelle, chronophage, et source d’erreurs.
+L’objectif est de fournir aux Business Analysts et Développeurs un outil simple et efficace pour générer ou anonymiser des jeux de données, adaptés aux besoins métiers et conformes aux normes internes.
+
+Objectifs du stage
+* Concevoir et développer une application web permettant :
+* La définition de modèles de données métiers (ex : client, compte, transaction…)
+* La génération automatique de jeux de données réalistes et variés
+* L’anonymisation de jeux de données existants (import de fichiers)
+* L’export des jeux de données dans différents formats (CSV, JSON, SQL…)
+* Garantir la confidentialité  (suppression, masquage, pseudonymisation des données sensibles)
+* Proposer une interface simple, ergonomique et accessible aux BA et développeurs
+Fonctionnalités attendues
+1. Gestion des modèles de données
+* Création, édition, suppression de modèles métiers 
+* Définition des types de champs, contraintes, formats, règles de génération
+2. Génération de jeux de données
+* Génération en masse de données réalistes (noms, emails, IBAN, dates, etc.)
+* Personnalisation du volume et des règles de génération
+* Cohérence des données entre entités liées (ex : clients et comptes)
+3. Anonymisation de données existantes
+* Import de fichiers (CSV, JSON…)
+* Anonymisation automatique ou personnalisée des champs sensibles
+* Export du fichier anonymisé
+4. Export et partage
+* Export des jeux de données générés ou anonymisés (CSV, JSON, SQL, Excel…)
+* Historique des jeux de données générés
+* Possibilité de partager un jeu de données avec d’autres utilisateurs
+5. Sécurité et conformité
+* Authentification des utilisateurs avec Sg Connect
+* Respect des normes internes SG
+
+Stack technique préconisée
+* Backend : Spring Boot (Java 17)
+* Frontend : React (TypeScript), 
+* Base de données : PostgreSQL ou H2 (pour le stockage des modèles et historiques)
+
+
+
+Déroulement et jalons
+1. Prise de connaissance du besoin et des normes internes
+2. Conception technique et maquettage de l’interface
+3. Développement du backend (API, logique de génération/anonymisation)
+4. Développement du frontend (UI, intégration API)
+5. Tests, documentation et recette
+6. Présentation finale et passation
