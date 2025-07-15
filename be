@@ -59,3 +59,21 @@ public class GetContactUsSettingImpl implements GetContactUsSetting {
         return new GetContactUsSettingResponse("Max retries from setting: " + maxRetries);
     }
 }
+
+
+--------
+public class ConvertUtils {
+    public static Object convert(String value, Class<?> targetType) {
+        if (targetType == Integer.class || targetType == int.class) {
+            return Integer.valueOf(value);
+        } else if (targetType == Boolean.class || targetType == boolean.class) {
+            return Boolean.valueOf(value);
+        } else if (targetType == Long.class || targetType == long.class) {
+            return Long.valueOf(value);
+        } else if (targetType == String.class) {
+            return value;
+        }
+        // Ajoute d'autres types si besoin
+        throw new IllegalArgumentException("Type non supporté : " + targetType);
+    }
+}
