@@ -1,27 +1,12 @@
-private void logErrorWithContext(String error, HttpRequest request, RequestContext context, Exception e) {
-        StringBuilder logMsg = new StringBuilder();
-        logMsg.append("message: \"").append(error).append("\"");
-        if (context != null) {
-            // Récupération sécurisée du DIGITAL_ID
-            try {
-                if (context.getUser().isPresent() && context.getUser().get().getUserId() != null) {
-                    logMsg.append(", DIGITAL_ID: \"").append(context.getUser().get().getUserId()).append("\"");
-                }
-            } catch (Exception ex) {
-                // Ne rien faire si absent
-            }
-            // Gestion sécurisée du CBS_CLIENT_ID
-            try {
-                BankingCustomerId cbsId = context.requireBankingCustomerId();
-                if (cbsId != null) {
-                    logMsg.append(", CBS_CLIENT_ID: \"").append(cbsId).append("\"");
-                }
-            } catch (Exception ex) {
-                // Ne rien faire si absent
-            }
-        }
-        logMsg.append(", method: ").append(request.getMethod());
-        logMsg.append(", url: ").append(request.getUrl());
-        logMsg.append(", stack: ").append(ExceptionUtils.getStackTrace(e));
-        logger.error(logMsg.toString());
-    }
+   } catch (ConnectException e) {
+            error = "HTTP_CLIENT_CONNECT_EXCEPTION: " + ErrorUtil.unwrap(e).getMessage();
+            logErrorWithContext(error, request, context, e);
+            return handleErrorCode(error, HttpStatus.REQUEST_TIMEOUT);
+        } catch (HttpException e) {
+            error = "HTTP_CLIENT_ERROR: " + ErrorUtil.unwrap(e).getMessage();
+            logErrorWithContext(error, request, context, e);
+            return handleErrorCode(error, HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (IOException e) {
+            error = "IO_HTTP_CLIENT_ERROR: " + ErrorUtil.unwrap(e).getMessage();
+            logErrorWithContext(error, request, context, e);
+            return handleError("Communication Failure when calling Peer...", HttpStatus.INTERNAL_SERVER_ERROR);
