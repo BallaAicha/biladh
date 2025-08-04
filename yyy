@@ -1,0 +1,82 @@
+_CreateAmortizableLoanRequest.java
+
+
+import lombok.Getter;
+import lombok.Setter;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Pattern;
+
+@Getter
+@Setter
+@SuppressWarnings("PMD.ClassNamingConventions")
+public class _CreateAmortizableLoanRequest {
+    
+    // Informations générales du dossier de prêt
+    @NotNull
+    private String branchCode;
+    
+    @NotNull
+    private String currencyCode;
+    
+    @NotNull
+    private String loanTypeCode;
+    
+    @NotNull
+    private String customerCode;
+    
+    // Description du prêt
+    @NotNull
+    private String establishmentDate;
+    
+    @NotNull
+    private String firstInstallmentDate;
+    
+    @NotNull
+    private Integer installmentsNumber;
+    
+    @NotNull
+    @Pattern(regexp = "^[NOPCD]$", message = "ScheduleType must be one of: N, O, P, C, D")
+    private String scheduleType; // N, O, P, C, D
+    
+    // Accessoires financiers
+    @NotNull
+    @DecimalMin(value = "0.0", inclusive = false)
+    private Double capitalAmount;
+    
+    @NotNull
+    @DecimalMin(value = "0.0")
+    private Double interestRate;
+    
+    private Double feesAmount;
+    
+    // Notes et commentaires
+    private String objectComment;
+    private String loanFileNote;
+    
+    // Distribution des échéances
+    @NotNull
+    @Pattern(regexp = "^[CE]$", message = "ActorType must be one of: C, E")
+    private String actorType; // C (Caution), E (Co_emprunteur)
+    
+    @NotNull
+    private String actorCustomerCode;
+    
+    @NotNull
+    private String paymentMethod;
+    
+    @NotNull
+    @DecimalMin(value = "0.0")
+    @DecimalMax(value = "100.0")
+    private Double distributedRate;
+    
+    // Compte de remboursement
+    @NotNull
+    private String repaymentBranchCode;
+    
+    @NotNull
+    private String repaymentCurrencyCode;
+    
+    @NotNull
+    private String repaymentAccountNumber;
+}
