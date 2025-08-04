@@ -1,0 +1,19 @@
+INTERFACE - _CreateAmortizableLoan.java
+
+package com.socgen.unibank.bridge.model.usecases;
+
+import org.springframework.security.access.annotation.Secured;
+import org.springframework.web.bind.annotation.PostMapping;
+import io.swagger.v3.oas.annotations.Operation;
+import javax.annotation.security.RolesAllowed;
+
+@SuppressWarnings("PMD.ClassNamingConventions")
+public interface _CreateAmortizableLoan extends Command {
+    @Operation(
+        summary = "Create an amortizable loan file",
+        operationId = "BrCreateAmortizableLoan"
+    )
+    @RolesAllowed({Permissions.IS_AUTHENTICATED, Permissions.IS_USER, Permissions.IS_APPLICATION})
+    @PostMapping("amortizable-loan")
+    AmortizableLoanResponse handle(_CreateAmortizableLoanRequest input, RequestContext context);
+}
