@@ -1,0 +1,45 @@
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationListener;
+import org.springframework.context.ConfigurableApplicationContext;
+
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
+
+@SpringBootApplication
+public class DemoApplication {
+
+    public static void main(String[] args) {
+        SpringApplication app = new SpringApplication(DemoApplication.class);
+
+        // Ajout d’un listener pour mesurer les métriques
+        app.addListeners((ApplicationListener<ApplicationReadyEvent>) event -> {
+            ConfigurableApplicationContext ctx = event.getApplicationContext();
+
+            // 1️⃣ Temps de démarrage
+            long jvmStartTime = ManagementFactory.getRuntimeMXBean().getStartTime();
+            long now = System.currentTimeMillis();
+            long duration = now - jvmStartTime;
+
+            // 2️⃣ Nombre de beans instanciés
+            int beanCount = ctx.getBeanDefinitionCount();
+
+            // 3️⃣ Mémoire utilisée
+            MemoryUsage heapMemoryUsage = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
+            long usedMemoryMb = heapMemoryUsage.getUsed() / (1024 * 1024);
+
+            // 4️⃣ Threads actifs
+            int threadCount = ManagementFactory.getThreadMXBean().getThreadCount();
+
+            // Affichage des métriques
+            System.out.println("📊 --- METRICS DEMARRAGE ---");
+            System.out.println("⏱ Temps total JVM + Spring Boot : " + duration + " ms (" + (duration / 1000.0) + " s)");
+            System.out.println("🧩 Nombre de beans instanciés : " + beanCount);
+            System.out.println("💾 Mémoire utilisée au démarrage : " + usedMemoryMb + " Mo");
+            System.out.println("⚡ Threads actifs au démarrage : " + threadCount);
+        });
+
+        app.run(args);
+    }
+}
