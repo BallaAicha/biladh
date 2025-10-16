@@ -1,1 +1,70 @@
-S
+@SneakyThrows
+public static void bootstrap(DataSource dataSource, String tablesPrefix, String schemaName) {
+    if (initializedSchemas.contains(schemaName)) {
+        return;
+    }
+    initializedSchemas.add(schemaName);
+    
+    SpringLiquibase liquibase = new SpringLiquibase() {
+        @Override
+        protected Database createDatabase(Connection connection, ResourceAccessor resourceAccessor) {
+            try {
+                Database database = DatabaseFactory.getInstance()
+                        .findCorrectDatabaseImplementation(new JdbcConnection(connection));
+                
+                database.setObjectQuotingStrategy(ObjectQuotingStrategy.QUOTE_ALL_OBJECTS);
+                
+                if (database instanceof liquibase.database.core.H2Database) {
+                    try (Statement stmt = connection.createStatement()) {
+                        stmt.execute("SET DATABASE_TO_UPPER FALSE");
+                    }
+                }
+                
+                return database;
+            } catch (Exception e) {
+                throw new RuntimeException("Erreur lors de la configuration de Liquibase", e);
+            }
+        }
+        
+        @Override
+        protected Liquibase createLiquibase(Connection c) throws LiquibaseException {
+            // ICI on utilise notre ResourceAccessor custom
+            AutoQuotingResourceAccessor resourceAccessor = new AutoQuotingResourceAccessor();
+            Database database = createDatabase(c, resourceAccessor);
+            
+            // Créer Liquibase avec notre ResourceAccessor
+            Liquibase liquibase = new Liquibase(getChangeLog(), resourceAccessor, database);
+            
+            // Appliquer les paramètres
+            if (getChangeLogParameters() != null) {
+                for (Map.Entry<String, String> entry : getChangeLogParameters().entrySet()) {
+                    liquibase.setChangeLogParameter(entry.getKey(), entry.getValue());
+                }
+            }
+            
+            return liquibase;
+        }
+    };
+    
+    // Configuration standard
+    liquibase.setChangeLog("classpath:db/liquibase-master-changelog.xml");
+    liquibase.setDropFirst(false);
+    
+    if (!StringUtils.isBlank(tablesPrefix)) {
+        liquibase.setChangeLogParameters(ImmutableMap.of(
+                "service.name", tablesPrefix
+        ));
+        liquibase.setDatabaseChangeLogLockTable(tablesPrefix + "_changelog_lock");
+        liquibase.setDatabaseChangeLogTable(tablesPrefix + "_changelog");
+    }
+    
+    // NE PAS appeler setResourceLoader ici
+    liquibase.setDataSource(dataSource);
+    
+    if (!StringUtils.isBlank(schemaName)) {
+        liquibase.setDefaultSchema(schemaName);
+        liquibase.setLiquibaseSchema(schemaName);
+    }
+    
+    liquibase.afterPropertiesSet();
+}
