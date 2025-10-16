@@ -1,61 +1,64 @@
-package com.socgen.unibank.platform.springboot.config.jpa;
-
-import liquibase.resource.ClassLoaderResourceAccessor;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-
-public class AutoQuotingResourceAccessor extends ClassLoaderResourceAccessor {
-    
-    @Override
-    public InputStream openStream(String relativeTo, String streamPath) throws IOException {
-        // Récupérer le flux original
-        InputStream originalStream = super.openStream(relativeTo, streamPath);
-        
-        // Vérifier si c'est un fichier de changelog à modifier
-        if (isChangelogFile(streamPath)) {
-            return modifyChangelogContent(originalStream, streamPath);
-        }
-        
-        return originalStream;
+@SneakyThrows
+public static void bootstrap(DataSource dataSource, String tablesPrefix, String schemaName) {
+    if (initializedSchemas.contains(schemaName)) {
+        return;
     }
+    initializedSchemas.add(schemaName);
     
-    /**
-     * Vérifie si le fichier doit être modifié
-     */
-    private boolean isChangelogFile(String streamPath) {
-        return streamPath != null && 
-               streamPath.contains("changelog") && 
-               streamPath.endsWith(".xml") &&
-               !streamPath.contains("master"); // Optionnel : éviter de modifier le master
-    }
-    
-    /**
-     * Modifie le contenu du changelog pour ajouter objectQuotingStrategy
-     */
-    private InputStream modifyChangelogContent(InputStream originalStream, String streamPath) throws IOException {
-        // Lire tout le contenu
-        byte[] bytes = originalStream.readAllBytes();
-        String content = new String(bytes, StandardCharsets.UTF_8);
-        
-        // Vérifier si le fichier contient databaseChangeLog et n'a pas déjà objectQuotingStrategy
-        if (content.contains("<databaseChangeLog") && !content.contains("objectQuotingStrategy")) {
+    SpringLiquibase liquibase = new SpringLiquibase() {
+        @Override
+        protected Liquibase createLiquibase(Connection c) throws LiquibaseException {
+            // Créer notre ResourceAccessor custom
+            AutoQuotingResourceAccessor resourceAccessor = new AutoQuotingResourceAccessor();
             
-            // Ajouter objectQuotingStrategy="QUOTE_ALL_OBJECTS"
-            content = content.replace(
-                "<databaseChangeLog",
-                "<databaseChangeLog objectQuotingStrategy=\"QUOTE_ALL_OBJECTS\""
-            );
+            // Créer la database
+            Database database = DatabaseFactory.getInstance()
+                    .findCorrectDatabaseImplementation(new JdbcConnection(c));
             
-            // Log pour debug (vous pouvez commenter si pas nécessaire)
-            System.out.println("✅ Added objectQuotingStrategy to: " + streamPath);
+            // Configurer la database
+            database.setObjectQuotingStrategy(ObjectQuotingStrategy.QUOTE_ALL_OBJECTS);
+            
+            if (database instanceof liquibase.database.core.H2Database) {
+                try (Statement stmt = c.createStatement()) {
+                    stmt.execute("SET DATABASE_TO_UPPER FALSE");
+                } catch (SQLException e) {
+                    throw new LiquibaseException(e);
+                }
+            }
+            
+            // Créer Liquibase
+            Liquibase liquibase = new Liquibase(getChangeLog(), resourceAccessor, database);
+            
+            // Appliquer les paramètres s'ils existent
+            Map<String, String> params = getChangeLogParameters();
+            if (params != null) {
+                for (Map.Entry<String, String> entry : params.entrySet()) {
+                    liquibase.setChangeLogParameter(entry.getKey(), entry.getValue());
+                }
+            }
+            
+            return liquibase;
         }
-        
-        // Retourner le contenu modifié
-        return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    };
+    
+    // Configuration
+    liquibase.setChangeLog("classpath:db/liquibase-master-changelog.xml");
+    liquibase.setDropFirst(false);
+    
+    if (!StringUtils.isBlank(tablesPrefix)) {
+        liquibase.setChangeLogParameters(ImmutableMap.of(
+                "service.name", tablesPrefix
+        ));
+        liquibase.setDatabaseChangeLogLockTable(tablesPrefix + "_changelog_lock");
+        liquibase.setDatabaseChangeLogTable(tablesPrefix + "_changelog");
     }
     
-    @Override
-    public ClassLoader getClassLoader() {
-        return Thread.currentThread().getContextClassLoader();
+    liquibase.setDataSource(dataSource);
+    
+    if (!StringUtils.isBlank(schemaName)) {
+        liquibase.setDefaultSchema(schemaName);
+        liquibase.setLiquibaseSchema(schemaName);
     }
+    
+    liquibase.afterPropertiesSet();
 }
