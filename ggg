@@ -1,1 +1,116 @@
-s
+package com.poc.batch;
+
+import com.poc.batch.service.PersonImportService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.beans.factory.annotation.Value;
+
+/**
+ * Application principale pour le POC Batch CSV
+ * Lance automatiquement l'import au démarrage
+ */
+@Slf4j
+@RequiredArgsConstructor
+@SpringBootApplication
+public class PocBatchApplication implements CommandLineRunner {
+    
+    private final PersonImportService personImportService;
+    
+    @Value("${batch.csv.file-path:persons.csv}")
+    private String csvFilePath;
+    
+    public static void main(String[] args) {
+        SpringApplication.run(PocBatchApplication.class, args);
+    }
+    
+    @Override
+    public void run(String... args) throws Exception {
+        log.info("========================================");
+        log.info("Démarrage de l'application POC Batch CSV");
+        log.info("========================================");
+        
+        try {
+            log.info("Lancement de l'import depuis le fichier : {}", csvFilePath);
+            personImportService.launchImport(csvFilePath);
+            log.info("========================================");
+            log.info("Import terminé avec succès !");
+            log.info("========================================");
+        } catch (Exception e) {
+            log.error("Erreur lors de l'import", e);
+            throw e;
+        }
+    }
+}
+
+----------------
+
+
+
+
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+
+    <changeSet id="001-create-persons-table" author="poc-batch">
+        <comment>Création de la table persons pour stocker les personnes importées depuis le CSV</comment>
+        
+        <createTable tableName="persons">
+            <column name="id" type="BIGSERIAL">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            
+            <column name="nom" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="prenom" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            
+            <column name="gender" type="VARCHAR(10)">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="age" type="INTEGER">
+                <constraints nullable="true"/>
+            </column>
+            
+            <column name="created_at" type="TIMESTAMP" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="true"/>
+            </column>
+        </createTable>
+        
+        <!-- Index pour améliorer les performances -->
+        <createIndex indexName="idx_persons_nom" tableName="persons">
+            <column name="nom"/>
+        </createIndex>
+        
+        <createIndex indexName="idx_persons_prenom" tableName="persons">
+            <column name="prenom"/>
+        </createIndex>
+        
+        <!-- Commentaire sur la table -->
+        <sql>
+            COMMENT ON TABLE persons IS 'Table contenant les personnes importées depuis le fichier CSV';
+            COMMENT ON COLUMN persons.id IS 'Identifiant unique de la personne';
+            COMMENT ON COLUMN persons.nom IS 'Nom de la personne';
+            COMMENT ON COLUMN persons.prenom IS 'Prénom de la personne';
+            COMMENT ON COLUMN persons.gender IS 'Genre de la personne (M/F)';
+            COMMENT ON COLUMN persons.age IS 'Âge de la personne';
+            COMMENT ON COLUMN persons.created_at IS 'Date de création de l''enregistrement';
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>
+
+
+
+
+
+---------
