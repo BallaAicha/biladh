@@ -1,0 +1,405 @@
+package com.poc.batch.processor;
+
+import com.poc.batch.entity.PersonEntity;
+import com.poc.batch.model.PersonLine;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+/**
+ * Processor pour valider et transformer PersonLine en PersonEntity
+ */
+@Slf4j
+@Component
+public class PersonProcessor implements ItemProcessor<PersonLine, PersonEntity> {
+    
+    @Override
+    public PersonEntity process(PersonLine personLine) throws Exception {
+        // Validation
+        if (!isValid(personLine)) {
+            log.warn("Ligne invalide ignorée : {} {}", 
+                    personLine.getNom(), personLine.getPrenom());
+            return null; // Retourner null filtre l'élément (ne sera pas écrit)
+        }
+        
+        // Conversion vers l'entité
+        PersonEntity entity = PersonEntity.fromPersonLine(personLine);
+        
+        // Normalisation (optionnel)
+        entity.setNom(capitalize(entity.getNom()));
+        entity.setPrenom(capitalize(entity.getPrenom()));
+        entity.setGender(normalizeGender(entity.getGender()));
+        
+        return entity;
+    }
+    
+    /**
+     * Validation des données
+     */
+    private boolean isValid(PersonLine personLine) {
+        return StringUtils.hasText(personLine.getNom())
+            && StringUtils.hasText(personLine.getPrenom())
+            && personLine.getAge() == null || personLine.getAge() >= 0;
+    }
+    
+    /**
+     * Normalisation : première lettre en majuscule
+     */
+    private String capitalize(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        return str.substring(0, 1).toUpperCase() + str.substring(1).toLowerCase();
+    }
+    
+    /**
+     * Normalisation du genre
+     */
+    private String normalizeGender(String gender) {
+        if (gender == null) {
+            return null;
+        }
+        String normalized = gender.trim().toUpperCase();
+        if (normalized.equals("M") || normalized.equals("MALE") || normalized.equals("HOMME")) {
+            return "M";
+        } else if (normalized.equals("F") || normalized.equals("FEMALE") || normalized.equals("FEMME")) {
+            return "F";
+        }
+        return normalized;
+    }
+}
+
+------------------------------------
+
+
+package com.poc.batch.writer;
+
+import com.poc.batch.entity.PersonEntity;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.item.Chunk;
+import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.database.JpaItemWriter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
+
+import jakarta.persistence.EntityManagerFactory;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Writer pour persister les entités PersonEntity en base de données
+ */
+@Slf4j
+@Component
+public class PersonWriter implements ItemWriter<PersonEntity> {
+    
+    @Autowired
+    private EntityManagerFactory entityManagerFactory;
+    
+    @Override
+    public void write(Chunk<? extends PersonEntity> chunk) throws Exception {
+        // Initialisation du JpaItemWriter
+        JpaItemWriter<PersonEntity> jpaWriter = new JpaItemWriter<>();
+        jpaWriter.setEntityManagerFactory(entityManagerFactory);
+        
+        // Conversion du chunk en liste
+        List<PersonEntity> entities = new ArrayList<>(chunk.getItems());
+        
+        // Écriture en base si la liste n'est pas vide
+        if (CollectionUtils.isNotEmpty(entities)) {
+            log.debug("Écriture de {} entités en base de données", entities.size());
+            Chunk<PersonEntity> entitiesChunk = new Chunk<>(entities);
+            jpaWriter.write(entitiesChunk);
+        }
+    }
+}
+
+
+
+
+-------------
+
+package com.poc.batch.listener;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.ChunkListener;
+import org.springframework.batch.core.scope.context.ChunkContext;
+import org.springframework.stereotype.Component;
+
+/**
+ * Listener pour suivre l'exécution du batch
+ */
+@Slf4j
+@Component
+public class PersonImportListener implements ChunkListener {
+    
+    @Override
+    public void beforeChunk(ChunkContext context) {
+        // Exécuté avant chaque chunk
+    }
+    
+    @Override
+    public void afterChunk(ChunkContext context) {
+        // Récupération des statistiques
+        long readCount = context.getStepContext()
+            .getStepExecution()
+            .getReadCount();
+        
+        long skipCount = context.getStepContext()
+            .getStepExecution()
+            .getProcessSkipCount();
+        
+        long writtenCount = context.getStepContext()
+            .getStepExecution()
+            .getWriteCount();
+        
+        // Log des statistiques
+        log.info("=== Statistiques Batch ===");
+        log.info("Lignes lues : {}", readCount);
+        log.info("Lignes ignorées : {}", skipCount);
+        log.info("Lignes écrites : {}", writtenCount);
+        log.info("========================");
+    }
+    
+    @Override
+    public void afterChunkError(ChunkContext context) {
+        log.error("Erreur lors du traitement d'un chunk");
+    }
+}
+
+
+
+----------------
+package com.poc.batch.config;
+
+import com.poc.batch.entity.PersonEntity;
+import com.poc.batch.listener.PersonImportListener;
+import com.poc.batch.mapper.PersonLineMapper;
+import com.poc.batch.model.PersonLine;
+import com.poc.batch.processor.PersonProcessor;
+import com.poc.batch.writer.PersonWriter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
+import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.item.ItemProcessor;
+import org.springframework.batch.item.ItemStreamReader;
+import org.springframework.batch.item.ItemWriter;
+import org.springframework.batch.item.file.FlatFileItemReader;
+import org.springframework.batch.item.file.mapping.DefaultLineMapper;
+import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.transaction.PlatformTransactionManager;
+
+/**
+ * Configuration Spring Batch pour l'import de personnes depuis un fichier CSV
+ */
+@RequiredArgsConstructor
+@Configuration
+public class PersonBatchConfig {
+    
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
+    private final PersonImportListener personImportListener;
+    private final PersonLineMapper personLineMapper;
+    
+    // ========== CONFIGURATION DU READER ==========
+    
+    @StepScope
+    @Bean
+    public ItemStreamReader<PersonLine> personCsvFileReader(
+            @Value("#{jobParameters['filePath']}") String filePath) {
+        
+        FlatFileItemReader<PersonLine> reader = new FlatFileItemReader<>();
+        
+        // Configuration de la ressource (fichier CSV)
+        reader.setResource(new FileSystemResource(filePath));
+        
+        // Configuration du mapper de ligne
+        DefaultLineMapper<PersonLine> lineMapper = new DefaultLineMapper<>();
+        
+        // Tokenizer : définit comment découper chaque ligne (séparateur virgule)
+        DelimitedLineTokenizer tokenizer = new DelimitedLineTokenizer();
+        tokenizer.setDelimiter(",");
+        tokenizer.setNames("nom", "prenom", "gender", "age");
+        
+        lineMapper.setLineTokenizer(tokenizer);
+        lineMapper.setFieldSetMapper(personLineMapper);
+        
+        reader.setLineMapper(lineMapper);
+        reader.setLinesToSkip(1); // Ignorer la ligne d'en-tête
+        
+        return reader;
+    }
+    
+    // ========== CONFIGURATION DU STEP ==========
+    
+    @Bean
+    public Step importPersonStep(
+            ItemStreamReader<PersonLine> personCsvFileReader,
+            ItemProcessor<PersonLine, PersonEntity> personProcessor,
+            ItemWriter<PersonEntity> personWriter) {
+        
+        return new StepBuilder("importPersonStep", jobRepository)
+                .<PersonLine, PersonEntity>chunk(50, transactionManager)
+                .reader(personCsvFileReader)
+                .processor(personProcessor)
+                .writer(personWriter)
+                .faultTolerant()
+                .listener(personImportListener)
+                .build();
+    }
+    
+    // ========== CONFIGURATION DU JOB ==========
+    
+    @Bean
+    public Job importPersonJob(Step importPersonStep) {
+        return new JobBuilder("importPersonJob", jobRepository)
+                .incrementer(new RunIdIncrementer())
+                .start(importPersonStep)
+                .build();
+    }
+}
+
+--------------
+package com.poc.batch.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.batch.core.Job;
+import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.core.launch.JobLauncher;
+import org.springframework.batch.core.repository.JobExecutionAlreadyRunningException;
+import org.springframework.batch.core.repository.JobInstanceAlreadyCompleteException;
+import org.springframework.batch.core.repository.JobRestartException;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service pour lancer l'import de personnes
+ */
+@Slf4j
+@RequiredArgsConstructor
+@Service
+public class PersonImportService {
+    
+    private final JobLauncher jobLauncher;
+    
+    @Qualifier("importPersonJob")
+    private final Job importPersonJob;
+    
+    /**
+     * Lance l'import des personnes depuis un fichier CSV
+     * 
+     * @param filePath Chemin absolu vers le fichier CSV
+     * @throws Exception En cas d'erreur lors du lancement
+     */
+    public void launchImport(String filePath) throws Exception {
+        log.info("=== Lancement de l'import des personnes ===");
+        log.info("Fichier : {}", filePath);
+        
+        // Construction des paramètres du job
+        JobParameters jobParameters = new JobParametersBuilder()
+                .addString("filePath", filePath)
+                .addLong("timestamp", System.currentTimeMillis()) // Pour rendre l'exécution unique
+                .toJobParameters();
+        
+        try {
+            // Lancement du job
+            var jobExecution = jobLauncher.run(importPersonJob, jobParameters);
+            log.info("Import terminé avec le statut : {}", jobExecution.getStatus());
+        } catch (JobExecutionAlreadyRunningException e) {
+            log.error("Un job est déjà en cours d'exécution", e);
+            throw new Exception("Un import est déjà en cours", e);
+        } catch (JobRestartException e) {
+            log.error("Erreur lors du redémarrage du job", e);
+            throw new Exception("Erreur lors du redémarrage de l'import", e);
+        } catch (JobInstanceAlreadyCompleteException e) {
+            log.error("Ce job a déjà été exécuté avec ces paramètres", e);
+            throw new Exception("Cet import a déjà été effectué", e);
+        }
+    }
+}
+
+-------------------
+package com.poc.batch.controller;
+
+import com.poc.batch.service.PersonImportService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Contrôleur REST pour lancer l'import de personnes
+ */
+@Slf4j
+@RestController
+@RequiredArgsConstructor
+public class PersonImportController {
+    
+    private final PersonImportService personImportService;
+    
+    @PostMapping("/api/batch/import-persons")
+    public ResponseEntity<String> importPersons(@RequestParam String filePath) {
+        try {
+            personImportService.launchImport(filePath);
+            return ResponseEntity.ok("Import lancé avec succès. Consultez les logs pour suivre la progression.");
+        } catch (Exception e) {
+            log.error("Erreur lors du lancement de l'import", e);
+            return ResponseEntity.status(500)
+                .body("Erreur lors du lancement de l'import : " + e.getMessage());
+        }
+    }
+}
+
+
+
+---------------------
+package com.poc.batch.repository;
+
+import com.poc.batch.entity.PersonEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+/**
+ * Repository JPA pour les entités PersonEntity
+ */
+@Repository
+public interface PersonRepository extends JpaRepository<PersonEntity, Long> {
+    // Méthodes personnalisées si nécessaire
+}
+
+
+
+----------------------
+
+
+
+nom,prenom,gender,age
+Dupont,Jean,M,35
+Martin,Marie,F,28
+Bernard,Pierre,M,42
+Dubois,Sophie,F,31
+Lefebvre,Thomas,M,29
+Moreau,Julie,F,26
+Garcia,Antoine,M,38
+Petit,Claire,F,33
+Roux,Michel,M,45
+Simon,Isabelle,F,30
+
+
+------------------
+
